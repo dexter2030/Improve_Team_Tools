@@ -80,6 +80,13 @@ export default async function ScoutingListPage({ searchParams }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href="/api/scouting/export"
+            className={buttonVariants({ variant: "outline" })}
+            title="Pobierz wszystkie profile jako CSV"
+          >
+            📤 Eksport CSV
+          </a>
           <Link
             href="/scouting/import"
             className={buttonVariants({ variant: "outline" })}
