@@ -13,6 +13,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "./theme-toggle";
 
 const NAV = [
   { href: "/scouting", label: "Scouting List", icon: Users },
@@ -61,7 +62,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
+      <div className="px-3 py-3 border-t border-sidebar-border space-y-1">
+        <ThemeToggle />
         <form action="/api/auth/logout" method="post">
           <button
             type="submit"
@@ -71,7 +73,7 @@ export function Sidebar() {
             <span>Wyloguj</span>
           </button>
         </form>
-        <p className="px-3 text-[10px] text-muted-foreground">
+        <p className="px-3 pt-1 text-[10px] text-muted-foreground">
           Live data — Riot API &amp; Leaguepedia
         </p>
       </div>
