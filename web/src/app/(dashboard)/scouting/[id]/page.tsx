@@ -1,0 +1,179 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { StatusBadge } from "@/components/status-badge";
+import { getProfile } from "@/lib/profiles/repository";
+import { ProfileActions } from "./profile-actions";
+import { NotesEditor } from "./notes-editor";
+import { ArrowLeft } from "lucide-react";
+
+export const dynamic = "force-dynamic";
+
+interface Props {
+  params: Promise<{ id: string }>;
+}
+
+export default async function ProfileDetailPage({ params }: Props) {
+  const { id } = await params;
+  const profile = await getProfile(id);
+  if (!profile) notFound();
+
+  const nResolved = profile.soloq.filter((s) => s.puuid !== null).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <Link
+            href="/scouting"
+            className={`${buttonVariants({ variant: "ghost", size: "sm" })} mb-2 -ml-2`}
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" /> Wszyscy gracze
+          </Link>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {profile.displayName}
+            </h2>
+            <StatusBadge state={profile.resolutionState} />
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            {profile.role} · {profile.age ?? "—"} lat · {profile.nationality ?? "—"}
+          </p>
+        </div>
+        <ProfileActions id={profile.profileId} />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Rola" value={profile.role} />
+        <StatCard
+          label="op.gg accounts"
+          value={profile.soloq.length ? `${nResolved}/${profile.soloq.length}` : "—"}
+        />
+        <StatCard
+          label="Team (pro)"
+          value={profile.proplay?.currentTeam ?? "—"}
+        />
+        <StatCard
+          label="Leaguepedia"
+          value={profile.proplay?.verified ? "verified" : "—"}
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>SoloQ accounts (op.gg)</CardTitle>
+          <CardDescription>
+            Konta wyciągnięte z linków op.gg, zweryfikowane przez Riot API.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {profile.soloq.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Brak kont SoloQ na tym profilu.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {profile.soloq.map((s, i) => (
+                <li key={i} className="flex items-center gap-3">
+                  <code className="bg-muted px-2 py-0.5 rounded text-xs">
+                    {s.riotId}
+                  </code>
+                  <span className="text-muted-foreground">({s.platform})</span>
+                  <span>
+                    {s.summonerLevel !== null
+                      ? `level ${s.summonerLevel}`
+                      : "unresolved"}
+                  </span>
+                  {s.opggUrl && (
+                    <a
+                      href={s.opggUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline ml-auto text-xs"
+                    >
+                      op.gg ↗
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {profile.proplay && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pro play (Leaguepedia)</CardTitle>
+            <CardDescription>
+              Tożsamość pro-play połączona po canonical wiki page name.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm space-y-1">
+            <div>
+              <span className="text-muted-foreground">Link:</span>{" "}
+              <code className="bg-muted px-2 py-0.5 rounded text-xs">
+                {profile.proplay.leaguepediaLink}
+              </code>
+            </div>
+            {profile.proplay.currentTeam && (
+              <div>
+                <span className="text-muted-foreground">Team:</span>{" "}
+                {profile.proplay.currentTeam}
+              </div>
+            )}
+            {profile.proplay.leaguepediaUrl && (
+              <div>
+                <a
+                  href={profile.proplay.leaguepediaUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary hover:underline text-xs"
+                >
+                  Leaguepedia ↗
+                </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Separator />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Scouting notes</CardTitle>
+          <CardDescription>
+            Twoje obserwacje. Zapisuje się na Save.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <NotesEditor id={profile.profileId} initial={profile.notes} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className="text-2xl">{value}</CardTitle>
+      </CardHeader>
+    </Card>
+  );
+}
