@@ -11,11 +11,13 @@ import {
   Trophy,
   Settings,
   LogOut,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
 
 const NAV = [
+  { href: "/", label: "Home", icon: Home },
   { href: "/scouting", label: "Scouting List", icon: Users },
   { href: "/scouting/add", label: "Add Player", icon: UserPlus },
   { href: "/draft-analyzer", label: "Draft Analyzer", icon: Swords },
@@ -43,7 +45,7 @@ export function Sidebar() {
         {NAV.map(({ href, label, icon: Icon }) => {
           const active =
             pathname === href ||
-            (href !== "/scouting" && pathname.startsWith(href));
+            (href !== "/" && href !== "/scouting" && pathname.startsWith(href));
           return (
             <Link
               key={href}
