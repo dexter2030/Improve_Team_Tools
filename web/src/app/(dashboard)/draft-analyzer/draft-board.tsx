@@ -162,19 +162,35 @@ export function DraftBoard({
   }
 
   function pushUrl(next: BoardState) {
+    // Zachowujemy istniejące filtry (league, patch) — board state zmienia
+    // tylko swoje klucze.
+    const merged = new URLSearchParams(sp.toString());
+    // Wyczyść wszystkie nasze klucze
+    for (const k of ["b1", "b2", "b3", "b4", "b5", "r1", "r2", "r3", "r4", "r5", "phase1Bans", "phase2Bans"]) {
+      merged.delete(k);
+    }
+    // Dodaj nowe
     const newSp = toUrl(next);
+    for (const [k, v] of newSp.entries()) merged.set(k, v);
     startTransition(() => {
       router.replace(
-        newSp.toString()
-          ? `/draft-analyzer/search?${newSp.toString()}`
-          : "/draft-analyzer/search"
+        merged.toString() ? `/draft-analyzer?${merged.toString()}` : "/draft-analyzer"
       );
     });
   }
 
   function reset() {
     setState(emptyState());
-    startTransition(() => router.replace("/draft-analyzer/search"));
+    // Zachowaj filtry league/patch, wyczyść tylko klucze boardu.
+    const merged = new URLSearchParams(sp.toString());
+    for (const k of ["b1", "b2", "b3", "b4", "b5", "r1", "r2", "r3", "r4", "r5", "phase1Bans", "phase2Bans"]) {
+      merged.delete(k);
+    }
+    startTransition(() =>
+      router.replace(
+        merged.toString() ? `/draft-analyzer?${merged.toString()}` : "/draft-analyzer"
+      )
+    );
   }
 
   // Wszystkie wybrane (do "used" dla pickera + sugestii — żeby nie pokazywać już użytych).

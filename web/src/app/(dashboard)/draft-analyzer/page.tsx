@@ -1,3 +1,14 @@
+/**
+ * Draft Analyzer — wszystko w jednym miejscu:
+ *   - Filtry (presety lig + patche) — URL params: league, patch
+ *   - Draft Board (klikalne sloty z sugestiami) — URL params: b1..r5, phase1Bans, phase2Bans
+ *   - Top first picks / Top first-phase bans (na filtrowanych draftach)
+ *   - Pasujące drafty (gdy pattern niepusty) ALBO ostatnie 50 (gdy pusty)
+ *
+ * Wszystkie statystyki + suggestions liczone na DRAFTACH PO FILTRACH lig/patchy,
+ * więc zmiana presetu/patcha aktualizuje board sugestie + stats jednocześnie.
+ */
+
 import {
   Card,
   CardContent,
@@ -6,7 +17,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { buttonVariants } from "@/components/ui/button";
 import { Info } from "lucide-react";
 import { Filters } from "./filters";
 import { ChampionCell, ChampionIcon } from "@/components/champion-cell";
@@ -20,162 +30,274 @@ import {
   filterByPatches,
   firstPickStats,
   phase1BanStats,
+  searchDrafts,
+  suggestAll,
+  isPatternEmpty,
+  type DraftPattern,
 } from "@/lib/drafts/analyzer";
+import { allChampionsMeta } from "@/lib/drafts/champion-icons";
+import { DraftBoard } from "./draft-board";
 
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: Promise<{ league?: string; patch?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }
 
 export default async function DraftAnalyzerPage({ searchParams }: Props) {
   const sp = await searchParams;
   const leagues = (sp.league ?? "").split(",").filter(Boolean);
   const patches = (sp.patch ?? "").split(",").filter(Boolean);
+  const pattern = parsePattern(sp);
 
-  const [total, allPatches] = await Promise.all([
+  const [total, allPatches, all, champions] = await Promise.all([
     countAllDrafts(),
     distinctPatches(),
+    safeGetDrafts(),
+    allChampionsMeta(),
   ]);
 
-  if (total === 0) {
-    return (
-      <div className="space-y-6">
-        <Header />
+  const iconByName: Record<string, string> = {};
+  for (const c of champions) iconByName[c.name] = c.iconUrl;
+
+  // Apply filters lig/patchy najpierw — pozostałe operacje (suggestions,
+  // matches, top stats) liczymy na tym zbiorze.
+  let filtered = all;
+  if (leagues.length > 0) filtered = filterByLeagues(filtered, leagues);
+  if (patches.length > 0) filtered = filterByPatches(filtered, patches);
+
+  // Suggestions na filtrowanych draftach — zmiana ligi/patcha zmienia
+  // top championów per slot natychmiast.
+  const suggestions = filtered.length > 0 ? suggestAll(filtered, pattern, 8) : null;
+  const matches = searchDrafts(filtered, pattern);
+  const firstPicks = firstPickStats(filtered, 10);
+  const bans = phase1BanStats(filtered, 10);
+  const hasPattern = !isPatternEmpty(pattern);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-semibold tracking-tight">Draft Analyzer</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Statystyki pick &amp; ban + interaktywny board. Zmiana presetu lig
+          albo patcha automatycznie aktualizuje sugestie obok slotów.
+        </p>
+      </div>
+
+      {total === 0 && (
         <Alert>
           <Info className="h-4 w-4" />
           <AlertTitle>Brak draftów w bazie</AlertTitle>
           <AlertDescription>
             Najpierw wczytaj drafty w zakładce <strong>Database</strong>. Po
-            synchronizacji wróć tutaj — statystyki i wyszukiwarka draftów
+            synchronizacji wróć tutaj — statystyki, sugestie i wyszukiwarka
             zaczną pokazywać dane.
           </AlertDescription>
         </Alert>
-      </div>
-    );
-  }
+      )}
 
-  // MVP: fetch wszystkie i filtruj w pamięci. Optymalizacja (server-side
-  // SQL filter) gdy zbiór będzie ciężki.
-  const all = await getAllDrafts();
-  let filtered = all;
-  if (leagues.length > 0) filtered = filterByLeagues(filtered, leagues);
-  if (patches.length > 0) filtered = filterByPatches(filtered, patches);
-
-  const firstPicks = firstPickStats(filtered, 10);
-  const bans = phase1BanStats(filtered, 10);
-
-  return (
-    <div className="space-y-6">
-      <Header />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtry</CardTitle>
-          <CardDescription>
-            {filtered.length === total
-              ? `Wszystkie ${total} draftów w bazie.`
-              : `${filtered.length} z ${total} draftów spełnia filtry.`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Filters patches={allPatches} />
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 lg:grid-cols-2">
+      {total > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Top first picks (B1)</CardTitle>
+            <CardTitle>Filtry</CardTitle>
             <CardDescription>
-              Najczęstszy pierwszy pick (Blue side B1) wśród filtrowanych draftów.
+              {filtered.length === total
+                ? `Wszystkie ${total} draftów w bazie.`
+                : `${filtered.length} z ${total} draftów spełnia filtry lig/patchy.`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChampionList entries={firstPicks} />
+            <Filters patches={allPatches} />
           </CardContent>
         </Card>
+      )}
 
+      {total > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>Top first-phase bans</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Draft Board</CardTitle>
             <CardDescription>
-              Najczęstsze bany fazy 1 (pierwsze 3 bany per strona).
+              Klikaj sloty żeby zbudować wzorzec. Top 5 sugestii pojawia się
+              obok każdego pustego slotu (na podstawie filtrowanych draftów).
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <div className="text-xs font-semibold mb-2 text-blue-700 dark:text-blue-400">
-                Blue side
-              </div>
-              <ChampionList entries={bans.blue} />
-            </div>
-            <div>
-              <div className="text-xs font-semibold mb-2 text-rose-700 dark:text-rose-400">
-                Red side
-              </div>
-              <ChampionList entries={bans.red} />
-            </div>
+          <CardContent>
+            <DraftBoard
+              champions={champions}
+              iconByName={iconByName}
+              suggestions={suggestions}
+            />
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Ostatnie drafty</CardTitle>
-          <CardDescription>
-            50 najnowszych draftów spełniających filtry.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="border-b">
-              <tr className="text-left text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Patch</th>
-                <th className="px-3 py-2 font-medium">Liga</th>
-                <th className="px-3 py-2 font-medium">Blue</th>
-                <th className="px-3 py-2 font-medium">vs</th>
-                <th className="px-3 py-2 font-medium">Red</th>
-                <th className="px-3 py-2 font-medium">Pickset (Blue / Red)</th>
-                <th className="px-3 py-2 font-medium">Wygrana</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.slice(0, 50).map((d) => (
-                <tr key={d.matchId} className="border-b hover:bg-muted/40">
-                  <td className="px-3 py-2 font-mono">{d.patch ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground max-w-[200px] truncate">
-                    {d.league}
-                  </td>
-                  <td className="px-3 py-2">{d.blueTeam ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">vs</td>
-                  <td className="px-3 py-2">{d.redTeam ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1">
-                      {[d.b1Pick, d.b2Pick, d.b3Pick, d.b4Pick, d.b5Pick].map((c, i) => (
-                        <ChampionIcon key={`b${i}`} name={c} size={22} />
-                      ))}
-                      <span className="text-muted-foreground mx-1">/</span>
-                      {[d.r1Pick, d.r2Pick, d.r3Pick, d.r4Pick, d.r5Pick].map((c, i) => (
-                        <ChampionIcon key={`r${i}`} name={c} size={22} />
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">{renderWinner(d.winner, d.blueTeam, d.redTeam)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
+      {/* Wyniki: gdy pattern niepusty pokazujemy pasujące drafty,
+          inaczej (czysta tablica) - top stats + ostatnie 50. */}
+      {total > 0 && hasPattern && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pasujące drafty</CardTitle>
+            <CardDescription>
+              {matches.length === 0
+                ? "Brak pasujących — rozluźnij wzorzec lub zmień filtry."
+                : `Znaleziono ${matches.length}. Pokazuję pierwsze 30.`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            {matches.length > 0 && (
+              <DraftsTable drafts={matches.slice(0, 30)} />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {total > 0 && !hasPattern && (
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Top first picks (B1)</CardTitle>
+                <CardDescription>
+                  Najczęstszy pierwszy pick wśród filtrowanych draftów.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChampionList entries={firstPicks} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Top first-phase bans</CardTitle>
+                <CardDescription>
+                  Najczęstsze bany fazy 1 (pierwsze 3 bany per strona).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <div className="text-xs font-semibold mb-2 text-blue-700 dark:text-blue-400">
+                    Blue side
+                  </div>
+                  <ChampionList entries={bans.blue} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-2 text-rose-700 dark:text-rose-400">
+                    Red side
+                  </div>
+                  <ChampionList entries={bans.red} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Ostatnie drafty</CardTitle>
+              <CardDescription>
+                50 najnowszych draftów spełniających filtry lig/patchy.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <DraftsTable drafts={filtered.slice(0, 50)} />
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
 
-/**
- * Cargo zwraca Winner jako "1" (Team1=Blue) lub "2" (Team2=Red), nie
- * jako nazwa drużyny. Mapujemy obie konwencje.
- */
+async function safeGetDrafts() {
+  try {
+    return await getAllDrafts();
+  } catch {
+    return [];
+  }
+}
+
+function parsePattern(sp: Record<string, string | undefined>): DraftPattern {
+  const get = (k: string): string | null => (sp[k] || "").trim() || null;
+  const list = (k: string): string[] =>
+    (sp[k] || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  return {
+    bluePicks: ["b1", "b2", "b3", "b4", "b5"].map(get),
+    redPicks: ["r1", "r2", "r3", "r4", "r5"].map(get),
+    phase1Bans: list("phase1Bans"),
+    phase2Bans: list("phase2Bans"),
+  };
+}
+
+interface DraftRow {
+  matchId: string;
+  patch: string | null;
+  league: string;
+  blueTeam: string | null;
+  redTeam: string | null;
+  winner: string | null;
+  b1Pick: string | null;
+  b2Pick: string | null;
+  b3Pick: string | null;
+  b4Pick: string | null;
+  b5Pick: string | null;
+  r1Pick: string | null;
+  r2Pick: string | null;
+  r3Pick: string | null;
+  r4Pick: string | null;
+  r5Pick: string | null;
+}
+
+function DraftsTable({ drafts }: { drafts: DraftRow[] }) {
+  return (
+    <table className="w-full text-xs">
+      <thead className="border-b bg-muted/40">
+        <tr className="text-left text-muted-foreground">
+          <th className="px-3 py-2 font-medium">Patch</th>
+          <th className="px-3 py-2 font-medium">Liga</th>
+          <th className="px-3 py-2 font-medium">Blue</th>
+          <th className="px-3 py-2 font-medium">vs</th>
+          <th className="px-3 py-2 font-medium">Red</th>
+          <th className="px-3 py-2 font-medium">Pickset (Blue / Red)</th>
+          <th className="px-3 py-2 font-medium">Wygrana</th>
+        </tr>
+      </thead>
+      <tbody>
+        {drafts.map((d) => (
+          <tr key={d.matchId} className="border-b hover:bg-muted/40">
+            <td className="px-3 py-2 font-mono">{d.patch ?? "—"}</td>
+            <td className="px-3 py-2 text-muted-foreground max-w-[200px] truncate">
+              {d.league}
+            </td>
+            <td className="px-3 py-2">{d.blueTeam ?? "—"}</td>
+            <td className="px-3 py-2 text-muted-foreground">vs</td>
+            <td className="px-3 py-2">{d.redTeam ?? "—"}</td>
+            <td className="px-3 py-2">
+              <div className="flex items-center gap-1">
+                {[d.b1Pick, d.b2Pick, d.b3Pick, d.b4Pick, d.b5Pick].map(
+                  (c, i) => (
+                    <ChampionIcon key={`b${i}`} name={c} size={22} />
+                  )
+                )}
+                <span className="text-muted-foreground mx-1">/</span>
+                {[d.r1Pick, d.r2Pick, d.r3Pick, d.r4Pick, d.r5Pick].map(
+                  (c, i) => (
+                    <ChampionIcon key={`r${i}`} name={c} size={22} />
+                  )
+                )}
+              </div>
+            </td>
+            <td className="px-3 py-2">
+              {renderWinner(d.winner, d.blueTeam, d.redTeam)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function renderWinner(
   winner: string | null,
   blueTeam: string | null,
@@ -191,26 +313,6 @@ function renderWinner(
       ? "text-rose-700 dark:text-rose-400 font-medium"
       : "";
   return <span className={className}>{team ?? "—"}</span>;
-}
-
-function Header() {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Draft Analyzer</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Statystyki pick &amp; ban na danych z Leaguepedia. Filtry zmieniają URL,
-          co pozwala udostępniać widoki.
-        </p>
-      </div>
-      <a
-        href="/draft-analyzer/search"
-        className={buttonVariants({ variant: "default" })}
-      >
-        🎯 Wyszukiwarka draftów
-      </a>
-    </div>
-  );
 }
 
 async function ChampionList({
