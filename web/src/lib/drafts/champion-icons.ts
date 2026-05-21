@@ -99,3 +99,36 @@ export async function allChampions(): Promise<string[]> {
     return [];
   }
 }
+
+export interface ChampionMeta {
+  name: string;
+  id: string; // DataDragon ID (np. "MonkeyKing", "JarvanIV")
+  iconUrl: string;
+  tags: string[]; // ["Fighter", "Tank", "Mage", "Assassin", "Marksman", "Support"]
+}
+
+/** Pełna lista championów z metadanymi + URL ikonki (pre-built dla pickerów). */
+export async function allChampionsMeta(): Promise<ChampionMeta[]> {
+  try {
+    const versionsRes = await fetch(VERSIONS_URL, { next: { revalidate: 86400 } });
+    const versions = (await versionsRes.json()) as string[];
+    const version = versions[0];
+    const champRes = await fetch(
+      `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`,
+      { next: { revalidate: 86400 } }
+    );
+    const data = (await champRes.json()) as {
+      data: Record<string, { id: string; name: string; tags: string[] }>;
+    };
+    return Object.values(data.data)
+      .map((c) => ({
+        name: c.name,
+        id: c.id,
+        iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${c.id}.png`,
+        tags: c.tags ?? [],
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
