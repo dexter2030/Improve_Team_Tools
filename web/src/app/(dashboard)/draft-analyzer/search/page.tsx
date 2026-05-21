@@ -45,8 +45,11 @@ export default async function DraftSearchPage({ searchParams }: Props) {
   for (const c of champions) iconByName[c.name] = c.iconUrl;
 
   const matches = searchDrafts(allDraftsList, pattern);
-  const suggestions = !isPatternEmpty(pattern)
-    ? suggestAll(allDraftsList, pattern, 6)
+
+  // Suggestions: zawsze liczymy (pusty pattern → top championów z całej bazy
+  // per pozycja, idealne do "tutaj jest typowy B1 w pro grze").
+  const suggestions = allDraftsList.length > 0
+    ? suggestAll(allDraftsList, pattern, 8)
     : null;
 
   return (
@@ -88,7 +91,11 @@ export default async function DraftSearchPage({ searchParams }: Props) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DraftBoard champions={champions} iconByName={iconByName} />
+          <DraftBoard
+            champions={champions}
+            iconByName={iconByName}
+            suggestions={suggestions}
+          />
         </CardContent>
       </Card>
 

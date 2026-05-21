@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, X, RotateCcw } from "lucide-react";
 import { ChampionPicker } from "./champion-picker";
 import type { ChampionMeta } from "@/lib/drafts/champion-icons";
+import type { SuggestAllResult, SuggestionEntry } from "@/lib/drafts/analyzer";
 
 /**
  * Kolejność draftu w prawdziwych grach (na 2-kolumnowej siatce):
@@ -30,56 +31,55 @@ interface SlotDef {
   kind: Kind;
   /** Klucz w URL search params. */
   key: string;
+  /** Klucz w SuggestAllResult.groups — bp0..bp4 / rp0..rp4 / phase1_bans / phase2_bans. */
+  suggestionGroup: string;
 }
 
 const ROWS: Array<[SlotDef, SlotDef]> = [
   [
-    { label: "BB1", side: "blue", kind: "ban", key: "phase1Bans[0]" },
-    { label: "RB1", side: "red", kind: "ban", key: "phase1Bans[1]" },
+    { label: "BB1", side: "blue", kind: "ban", key: "phase1Bans[0]", suggestionGroup: "phase1_bans" },
+    { label: "RB1", side: "red", kind: "ban", key: "phase1Bans[1]", suggestionGroup: "phase1_bans" },
   ],
   [
-    { label: "BB2", side: "blue", kind: "ban", key: "phase1Bans[2]" },
-    { label: "RB2", side: "red", kind: "ban", key: "phase1Bans[3]" },
+    { label: "BB2", side: "blue", kind: "ban", key: "phase1Bans[2]", suggestionGroup: "phase1_bans" },
+    { label: "RB2", side: "red", kind: "ban", key: "phase1Bans[3]", suggestionGroup: "phase1_bans" },
   ],
   [
-    { label: "BB3", side: "blue", kind: "ban", key: "phase1Bans[4]" },
-    { label: "RB3", side: "red", kind: "ban", key: "phase1Bans[5]" },
+    { label: "BB3", side: "blue", kind: "ban", key: "phase1Bans[4]", suggestionGroup: "phase1_bans" },
+    { label: "RB3", side: "red", kind: "ban", key: "phase1Bans[5]", suggestionGroup: "phase1_bans" },
   ],
   [
-    { label: "B1", side: "blue", kind: "pick", key: "b1" },
-    { label: "R1", side: "red", kind: "pick", key: "r1" },
+    { label: "B1", side: "blue", kind: "pick", key: "b1", suggestionGroup: "bp0" },
+    { label: "R1", side: "red", kind: "pick", key: "r1", suggestionGroup: "rp0" },
   ],
   [
-    { label: "B2", side: "blue", kind: "pick", key: "b2" },
-    { label: "R2", side: "red", kind: "pick", key: "r2" },
+    { label: "B2", side: "blue", kind: "pick", key: "b2", suggestionGroup: "bp1" },
+    { label: "R2", side: "red", kind: "pick", key: "r2", suggestionGroup: "rp1" },
   ],
   [
-    { label: "B3", side: "blue", kind: "pick", key: "b3" },
-    { label: "R3", side: "red", kind: "pick", key: "r3" },
+    { label: "B3", side: "blue", kind: "pick", key: "b3", suggestionGroup: "bp2" },
+    { label: "R3", side: "red", kind: "pick", key: "r3", suggestionGroup: "rp2" },
   ],
   [
-    { label: "BB4", side: "blue", kind: "ban", key: "phase2Bans[0]" },
-    { label: "RB4", side: "red", kind: "ban", key: "phase2Bans[1]" },
+    { label: "BB4", side: "blue", kind: "ban", key: "phase2Bans[0]", suggestionGroup: "phase2_bans" },
+    { label: "RB4", side: "red", kind: "ban", key: "phase2Bans[1]", suggestionGroup: "phase2_bans" },
   ],
   [
-    { label: "BB5", side: "blue", kind: "ban", key: "phase2Bans[2]" },
-    { label: "RB5", side: "red", kind: "ban", key: "phase2Bans[3]" },
+    { label: "BB5", side: "blue", kind: "ban", key: "phase2Bans[2]", suggestionGroup: "phase2_bans" },
+    { label: "RB5", side: "red", kind: "ban", key: "phase2Bans[3]", suggestionGroup: "phase2_bans" },
   ],
   [
-    { label: "B4", side: "blue", kind: "pick", key: "b4" },
-    { label: "R4", side: "red", kind: "pick", key: "r4" },
+    { label: "B4", side: "blue", kind: "pick", key: "b4", suggestionGroup: "bp3" },
+    { label: "R4", side: "red", kind: "pick", key: "r4", suggestionGroup: "rp3" },
   ],
   [
-    { label: "B5", side: "blue", kind: "pick", key: "b5" },
-    { label: "R5", side: "red", kind: "pick", key: "r5" },
+    { label: "B5", side: "blue", kind: "pick", key: "b5", suggestionGroup: "bp4" },
+    { label: "R5", side: "red", kind: "pick", key: "r5", suggestionGroup: "rp4" },
   ],
 ];
 
 interface BoardState {
-  // Picks: B1..B5, R1..R5 — pojedyncze stringi.
-  picks: Record<string, string>; // key="b1" → name
-  // Bans: phase1 (6 sloty, blue+red interleaved B1B,R1B,B2B,R2B,B3B,R3B),
-  // phase2 (4 sloty B4B,R4B,B5B,R5B). Indeksy 0..5 / 0..3.
+  picks: Record<string, string>;
   phase1Bans: string[];
   phase2Bans: string[];
 }
@@ -116,9 +116,12 @@ function toUrl(state: BoardState): URLSearchParams {
 export function DraftBoard({
   champions,
   iconByName,
+  suggestions,
 }: {
   champions: ChampionMeta[];
   iconByName: Record<string, string>;
+  /** SuggestAll wynik z serwera — pokazujemy obok pustych slotów. */
+  suggestions: SuggestAllResult | null;
 }) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -174,22 +177,33 @@ export function DraftBoard({
     startTransition(() => router.replace("/draft-analyzer/search"));
   }
 
-  // Wszystkie wybrane (do "used" dla pickera — same champion nie powinien być dwa razy).
+  // Wszystkie wybrane (do "used" dla pickera + sugestii — żeby nie pokazywać już użytych).
   const used = [
     ...Object.values(state.picks),
     ...state.phase1Bans,
     ...state.phase2Bans,
   ].filter(Boolean);
+  const usedSet = new Set(used);
 
   const hasAnything = used.length > 0;
+
+  function suggestionsFor(slot: SlotDef): SuggestionEntry[] {
+    if (!suggestions) return [];
+    const list = suggestions.groups[slot.suggestionGroup] ?? [];
+    // Filter out już-użyte i return top 5.
+    return list.filter((s) => !usedSet.has(s.champion)).slice(0, 5);
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Klikaj sloty żeby ustawić championy. Stan w URL — można udostępniać.
-          </span>
+        <div className="text-sm text-muted-foreground">
+          Klik slot żeby otworzyć picker, klik sugestię żeby pickować bezpośrednio.
+          {suggestions && suggestions.totalMatches > 0 && (
+            <span className="ml-2 text-xs">
+              Sugestie z <strong>{suggestions.totalMatches}</strong> pasujących pro draftów.
+            </span>
+          )}
         </div>
         {hasAnything && (
           <Button variant="outline" size="sm" onClick={reset}>
@@ -203,10 +217,19 @@ export function DraftBoard({
         {ROWS.map(([left, right], i) => (
           <div
             key={i}
-            className={`grid grid-cols-2 ${rowBg(left.kind)} ${
-              i < ROWS.length - 1 ? "border-b" : ""
-            }`}
+            className={`grid grid-cols-[1fr_auto_auto_1fr] items-center gap-2 px-2 py-1.5 ${rowBg(
+              left.kind
+            )} ${i < ROWS.length - 1 ? "border-b" : ""}`}
           >
+            {/* Sugestie blue side — po lewej */}
+            <SuggestionStrip
+              entries={valueAt(left) ? [] : suggestionsFor(left)}
+              iconByName={iconByName}
+              onPick={(name) => setSlot(left, name)}
+              align="right"
+            />
+
+            {/* Slot blue */}
             <Slot
               def={left}
               value={valueAt(left)}
@@ -215,12 +238,22 @@ export function DraftBoard({
               onClick={() => setEditing(left)}
               align="right"
             />
+
+            {/* Slot red */}
             <Slot
               def={right}
               value={valueAt(right)}
               iconByName={iconByName}
               onClear={() => setSlot(right, "")}
               onClick={() => setEditing(right)}
+              align="left"
+            />
+
+            {/* Sugestie red side — po prawej */}
+            <SuggestionStrip
+              entries={valueAt(right) ? [] : suggestionsFor(right)}
+              iconByName={iconByName}
+              onPick={(name) => setSlot(right, name)}
               align="left"
             />
           </div>
@@ -252,6 +285,53 @@ function rowBg(kind: Kind): string {
     : "bg-emerald-950/20 dark:bg-emerald-950/30";
 }
 
+/** Pasek 5 mini-ikonek sugestii. Pusty array = nic nie renderuje. */
+function SuggestionStrip({
+  entries,
+  iconByName,
+  onPick,
+  align,
+}: {
+  entries: SuggestionEntry[];
+  iconByName: Record<string, string>;
+  onPick: (name: string) => void;
+  align: "left" | "right";
+}) {
+  return (
+    <div
+      className={`flex items-center gap-1 ${
+        align === "right" ? "justify-end" : "justify-start"
+      }`}
+    >
+      {entries.map((e) => {
+        const icon = iconByName[e.champion];
+        return (
+          <button
+            key={e.champion}
+            onClick={() => onPick(e.champion)}
+            title={`${e.champion} — ${e.count}× (${e.pct.toFixed(0)}%)`}
+            className="relative h-8 w-8 rounded border-2 border-transparent hover:border-primary hover:scale-110 transition-all overflow-hidden"
+          >
+            {icon ? (
+              <img
+                src={icon}
+                alt={e.champion}
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-[8px]">{e.champion.slice(0, 3)}</span>
+            )}
+            <span className="absolute bottom-0 right-0 bg-black/60 text-white text-[8px] px-0.5 rounded-tl">
+              {e.pct.toFixed(0)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Slot({
   def,
   value,
@@ -269,59 +349,48 @@ function Slot({
 }) {
   const sideColor =
     def.side === "blue"
-      ? "border-blue-500/40 text-blue-700 dark:text-blue-400"
-      : "border-rose-500/40 text-rose-700 dark:text-rose-400";
+      ? "border-blue-500/60 text-blue-700 dark:text-blue-400"
+      : "border-rose-500/60 text-rose-700 dark:text-rose-400";
   const icon = value ? iconByName[value] : null;
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 ${
+      className={`flex items-center gap-1.5 ${
         align === "right" ? "flex-row-reverse" : ""
       }`}
     >
       <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-2 py-1 rounded border text-xs font-mono font-semibold transition-colors ${sideColor} ${
-          align === "right" ? "flex-row-reverse" : ""
-        } hover:bg-muted/50`}
+        className={`flex items-center justify-center w-10 h-8 rounded border text-[10px] font-mono font-bold transition-colors ${sideColor} hover:bg-muted/50 shrink-0`}
       >
-        <span>{def.label}</span>
+        {def.label}
       </button>
 
       <button
         onClick={onClick}
-        className={`flex-1 max-w-[260px] flex items-center gap-2 px-2 py-1.5 rounded border border-dashed transition-colors ${
-          align === "right" ? "flex-row-reverse" : ""
-        } ${
+        className={`flex items-center justify-center h-8 w-10 rounded border border-dashed transition-colors shrink-0 ${
           value
             ? "border-foreground/20 bg-background/60"
-            : "border-foreground/10 hover:border-foreground/30 hover:bg-muted/40"
+            : "border-foreground/15 hover:border-foreground/40 hover:bg-muted/40"
         }`}
+        title={value || "Kliknij żeby wybrać championa"}
       >
-        {value ? (
-          <>
-            {icon && (
-              <img
-                src={icon}
-                alt={value}
-                className="h-7 w-7 rounded"
-                loading="lazy"
-              />
-            )}
-            <span className="text-xs truncate flex-1 text-left">{value}</span>
-          </>
+        {value && icon ? (
+          <img
+            src={icon}
+            alt={value}
+            className="h-7 w-7 rounded"
+            loading="lazy"
+          />
         ) : (
-          <>
-            <Plus className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground italic">puste</span>
-          </>
+          <Plus className="h-3.5 w-3.5 text-muted-foreground" />
         )}
       </button>
 
       {value && (
         <button
           onClick={onClear}
-          className="text-muted-foreground hover:text-destructive p-1"
+          className="text-muted-foreground hover:text-destructive p-0.5"
           title="Wyczyść slot"
         >
           <X className="h-3 w-3" />
