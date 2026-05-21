@@ -158,3 +158,144 @@ export async function updateNotesAction(
   revalidatePath("/scouting");
   return { ok: true };
 }
+
+/**
+ * Re-resolve identity dla istniejącego profilu (świeży hit do Riot +
+ * Leaguepedia, nadpisuje puuid/level/team itd.). Nie zmienia metadata,
+ * notatek ani inputów (riotId/platform/leaguepediaLink).
+ */
+export async function reResolveAction(id: string): Promise<AddProfileResult> {
+  const { getProfile } = await import("@/lib/profiles/repository");
+  const profile = await getProfile(id);
+  if (!profile) return { ok: false, errors: ["Profil nie istnieje."] };
+
+  // Wyzeruj `is_resolved` flagi żeby resolver faktycznie pobierał na nowo
+  // (a nie zwracał "Already resolved" z cache w samym profilu).
+  const fresh = {
+    ...profile,
+    soloq: profile.soloq.map((s) => ({
+      ...s,
+      puuid: null,
+      summonerLevel: null,
+    })),
+    proplay: profile.proplay
+      ? { ...profile.proplay, verified: false, currentTeam: null }
+      : null,
+  };
+
+  const result = await getProfileResolver().resolve(fresh);
+  await upsertProfile(result.profile);
+  revalidatePath(`/scouting/${id}`);
+  revalidatePath("/scouting");
+
+  return {
+    ok: true,
+    profileId: result.profile.profileId,
+    reports: [...result.reports],
+  };
+}
+
+/**
+ * Edycja profilu — pełen update metadanych + opcjonalna zmiana linków
+ * (z re-resolve). Idempotentne dla pustych zmian.
+ */
+export async function editProfileAction(
+  id: string,
+  formData: FormData
+): Promise<AddProfileResult> {
+  const { getProfile } = await import("@/lib/profiles/repository");
+  const existing = await getProfile(id);
+  if (!existing) return { ok: false, errors: ["Profil nie istnieje."] };
+
+  const errors: string[] = [];
+
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  const roleRaw = String(formData.get("role") ?? "").trim();
+  const ageRaw = String(formData.get("age") ?? "").trim();
+  const nationality =
+    String(formData.get("nationality") ?? "").trim() || null;
+  const lolprosUrl = String(formData.get("lolprosUrl") ?? "").trim() || null;
+  const leaguepediaUrlRaw = String(formData.get("leaguepediaUrl") ?? "").trim();
+  const opggRaw = String(formData.get("opggUrls") ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!ROLES.includes(roleRaw as Role)) {
+    errors.push(`Nieznana rola: '${roleRaw}'.`);
+  }
+  if (!displayName) errors.push("Nazwa gracza jest wymagana.");
+  if (opggRaw.length === 0 && !leaguepediaUrlRaw) {
+    errors.push("Podaj przynajmniej jeden link op.gg lub Leaguepedia.");
+  }
+  const age = ageRaw ? Number(ageRaw) : null;
+  if (ageRaw && !Number.isFinite(age)) {
+    errors.push(`Wiek '${ageRaw}' nie jest liczbą.`);
+  }
+
+  // Parse nowe op.gg URLs — preservujemy puuid/level dla niezmienionych
+  // (riotId+platform dopasowany), nowe dostają puuid=null żeby się
+  // resolwowały.
+  const existingByRiotId = new Map(
+    existing.soloq.map((s) => [`${s.riotId}|${s.platform}`, s])
+  );
+  const soloq: SoloQIdentity[] = [];
+  for (const url of opggRaw) {
+    try {
+      const { riotId, platform } = parseOpggUrl(url);
+      const key = `${riotId}|${platform}`;
+      const prev = existingByRiotId.get(key);
+      soloq.push({
+        riotId,
+        platform,
+        opggUrl: url,
+        puuid: prev?.puuid ?? null,
+        summonerLevel: prev?.summonerLevel ?? null,
+      });
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  let proplay: ProPlayIdentity | null = null;
+  if (leaguepediaUrlRaw) {
+    try {
+      const link = parseLeaguepediaUrl(leaguepediaUrlRaw);
+      const prev = existing.proplay;
+      const sameLink = prev?.leaguepediaLink === link;
+      proplay = {
+        leaguepediaLink: link,
+        leaguepediaUrl: leaguepediaUrlRaw,
+        currentTeam: sameLink ? prev?.currentTeam ?? null : null,
+        verified: sameLink ? prev?.verified ?? false : false,
+      };
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  if (errors.length > 0) return { ok: false, errors };
+
+  // Profile z preservowanym ID + nowymi metadanymi.
+  const next = {
+    ...existing,
+    displayName,
+    role: roleRaw as Role,
+    age: age as number | null,
+    nationality,
+    lolprosUrl,
+    soloq,
+    proplay,
+  };
+
+  const result = await getProfileResolver().resolve(next);
+  await upsertProfile(result.profile);
+  revalidatePath(`/scouting/${id}`);
+  revalidatePath("/scouting");
+
+  return {
+    ok: true,
+    profileId: id,
+    reports: [...result.reports],
+  };
+}
