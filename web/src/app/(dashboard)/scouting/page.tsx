@@ -79,10 +79,18 @@ export default async function ScoutingListPage({ searchParams }: Props) {
             Lista obserwowanych zawodników z rozwiązanymi tożsamościami SoloQ i pro-play.
           </p>
         </div>
-        <Link href="/scouting/add" className={buttonVariants()}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Dodaj gracza
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/scouting/import"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            📥 Bulk import
+          </Link>
+          <Link href="/scouting/add" className={buttonVariants()}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Dodaj gracza
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
