@@ -12,7 +12,14 @@ const COOKIE_NAME = "ITT_AUTH";
 const COOKIE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 // Te ścieżki nie wymagają auth.
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout"];
+// /api/health/* zostawione publiczne — przydatne do uptime monitoring
+// (Vercel/UptimeRobot/etc.) bez konieczności obsługiwania cookies.
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/health",
+];
 
 export async function proxy(req: NextRequest) {
   const password = process.env.APP_PASSWORD;

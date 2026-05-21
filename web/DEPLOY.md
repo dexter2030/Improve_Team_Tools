@@ -28,7 +28,8 @@ DATABASE_URL=postgresql://postgres.apjjeztgdocravmmxnyd:HASLO@aws-1-eu-central-1
 NEXT_PUBLIC_SUPABASE_URL=https://apjjeztgdocravmmxnyd.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
 
-# Riot API key — dev wygasa co 24h
+# Riot API key — Personal (App ID 838521, NIE wygasa co 24h).
+# Można zregenerować w developer.riotgames.com (Personal API Key → Regenerate).
 RIOT_API_KEY=RGAPI-...
 
 # Leaguepedia bot-password (podnosi rate limit z anon ~1req/30s na kilka/s)
