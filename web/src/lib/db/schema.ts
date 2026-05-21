@@ -178,6 +178,40 @@ export type NewDraft = typeof drafts.$inferInsert;
 export type LeagueSync = typeof leagueSync.$inferSelect;
 export type NewLeagueSync = typeof leagueSync.$inferInsert;
 
+// --- lp_players_all (globalna baza graczy z Leaguepedia Players table) -----
+
+export const lpPlayersAll = pgTable(
+  "lp_players_all",
+  {
+    overviewPage: text("overview_page").primaryKey(),
+    id: text("id"),
+    team: text("team"),
+    role: text("role"),
+    country: text("country"),
+    residency: text("residency"),
+    nationalityPrimary: text("nationality_primary"),
+    isRetired: boolean("is_retired").notNull().default(false),
+    syncedAt: timestamp("synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("lp_players_role_idx").on(t.role),
+    index("lp_players_country_idx").on(t.country),
+    index("lp_players_team_idx").on(t.team),
+  ]
+);
+
+/** Singleton (id=1) — metadane ostatniego sync globalnej tabeli. */
+export const lpPlayersSync = pgTable("lp_players_sync", {
+  id: integer("id").primaryKey().default(1),
+  lastFetched: timestamp("last_fetched", { withTimezone: true }),
+  totalCount: integer("total_count"),
+});
+
+export type LpPlayer = typeof lpPlayersAll.$inferSelect;
+export type NewLpPlayer = typeof lpPlayersAll.$inferInsert;
+
 // --- Typy ze schemy (do użycia w Server Actions / Components) ---------------
 
 export type ScoutingProfile = typeof scoutingProfiles.$inferSelect;
