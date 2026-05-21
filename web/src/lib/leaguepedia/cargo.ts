@@ -3,13 +3,18 @@
  *
  * Cargo to extension MediaWiki — query przez ?action=cargoquery zwraca
  * { cargoquery: [{ title: {...} }, ...] }. Per-query limit 500; nad to
- * paginujemy przez `offset`. Tutaj zostawiamy single-query API +
- * helper na cienką paginację — wystarcza na MVP (scoreboard per player
- * mieści się w 500 wierszach).
+ * paginujemy przez `offset`. Tu zostawiamy single-query API + helper
+ * paginacji — wystarcza na MVP (scoreboard per player mieści się w 500).
  *
- * Tryb anonimowy. Bot-password (LEAGUEPEDIA_USERNAME/PASSWORD) podnosi
- * limit i jest TODO na później — w MVP klient anonimowy wystarcza dla
- * scoutingu pojedynczego gracza.
+ * Auth:
+ * - Anon mode (default): per-IP rate limit ~1 req / 30s. Dla developmentu
+ *   z jednego IP bardzo łatwo go uderzyć.
+ * - Bot-password (LEAGUEPEDIA_USERNAME + LEAGUEPEDIA_PASSWORD w env):
+ *   wyższy limit, lazy login na pierwszym requeście. Login flow:
+ *     1) GET ?action=query&meta=tokens&type=login → loginToken
+ *     2) POST action=login z lgname/lgpassword/lgtoken + cookies
+ *     3) Następne requesty wysyłają zebrany cookie jar
+ *   Singleton CargoSession trzyma cookies między requestami w procesie.
  */
 
 const CARGO_URL = "https://lol.fandom.com/api.php";
@@ -43,11 +48,125 @@ export function cargoEscape(value: string): string {
   return value.replace(/'/g, "\\'");
 }
 
+// --- Session (cookie jar + lazy login) -------------------------------------
+
+class CargoSession {
+  private cookies = new Map<string, string>();
+  private loginPromise: Promise<void> | null = null;
+  private authState: "anon" | "bot" | "error" = "anon";
+
+  /** Zwraca cookie header lub null jeśli nic nie ma. */
+  cookieHeader(): string | null {
+    if (this.cookies.size === 0) return null;
+    return [...this.cookies.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
+  }
+
+  /** Wchłania set-cookie z response (Node 18+ ma getSetCookie()). */
+  ingest(res: Response): void {
+    const setCookies = res.headers.getSetCookie();
+    for (const raw of setCookies) {
+      const head = raw.split(";")[0];
+      const eq = head.indexOf("=");
+      if (eq > 0) {
+        this.cookies.set(head.slice(0, eq).trim(), head.slice(eq + 1).trim());
+      }
+    }
+  }
+
+  /**
+   * Lazy login. Idempotentne — wiele równoległych callerów dostaje ten
+   * sam promise. Brak credentials → no-op (zostajemy w anon mode).
+   */
+  async ensureLoggedIn(fetcher: typeof fetch): Promise<void> {
+    if (this.authState === "bot" || this.authState === "error") return;
+    const username = process.env.LEAGUEPEDIA_USERNAME;
+    const password = process.env.LEAGUEPEDIA_PASSWORD;
+    if (!username || !password) return; // anon mode
+
+    if (this.loginPromise) return this.loginPromise;
+    this.loginPromise = this.doLogin(fetcher, username, password).catch(
+      (err) => {
+        this.authState = "error";
+        console.warn("[leaguepedia] bot login failed:", err);
+      }
+    );
+    return this.loginPromise;
+  }
+
+  private async doLogin(
+    fetcher: typeof fetch,
+    username: string,
+    password: string
+  ): Promise<void> {
+    // Step 1: login token
+    const tokenRes = await fetcher(
+      `${CARGO_URL}?action=query&meta=tokens&type=login&format=json`,
+      { headers: { "User-Agent": USER_AGENT }, cache: "no-store" }
+    );
+    this.ingest(tokenRes);
+    const tokenJson = (await tokenRes.json()) as {
+      query?: { tokens?: { logintoken?: string } };
+    };
+    const loginToken = tokenJson.query?.tokens?.logintoken;
+    if (!loginToken) throw new Error("No login token from MediaWiki.");
+
+    // Step 2: login POST
+    const body = new URLSearchParams({
+      action: "login",
+      lgname: username,
+      lgpassword: password,
+      lgtoken: loginToken,
+      format: "json",
+    });
+    const cookieHeader = this.cookieHeader();
+    const loginRes = await fetcher(CARGO_URL, {
+      method: "POST",
+      headers: {
+        "User-Agent": USER_AGENT,
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+      },
+      body: body.toString(),
+      cache: "no-store",
+    });
+    this.ingest(loginRes);
+    const loginJson = (await loginRes.json()) as {
+      login?: { result?: string; reason?: string };
+    };
+    if (loginJson.login?.result !== "Success") {
+      throw new Error(
+        `MediaWiki login failed: ${loginJson.login?.result ?? "unknown"}${
+          loginJson.login?.reason ? " — " + loginJson.login.reason : ""
+        }`
+      );
+    }
+    this.authState = "bot";
+  }
+
+  getAuthState(): "anon" | "bot" | "error" {
+    return this.authState;
+  }
+}
+
+// Singleton w procesie — cookie jar persists między requestami.
+let _session: CargoSession | null = null;
+
+function getSession(): CargoSession {
+  if (!_session) _session = new CargoSession();
+  return _session;
+}
+
+export function getCargoAuthState(): "anon" | "bot" | "error" {
+  return getSession().getAuthState();
+}
+
+// --- Cargo query -----------------------------------------------------------
+
 /**
  * Single Cargo query z retry na transient errors (`ratelimited`,
- * HTTP 5xx). Backoff exponential 1s → 2s → 4s → 8s, max 4 próby.
+ * HTTP 5xx). Backoff exp. 1→2→4→8s, max 4 próby.
  *
- * Bez retry na 4xx innych niż 429 — to błędy zapytania, retry nie pomoże.
+ * Bez retry na 4xx innych niż 429 — to błędy zapytania.
  */
 export async function cargoQuery(
   q: CargoQuery,
@@ -55,6 +174,9 @@ export async function cargoQuery(
 ): Promise<CargoRow[]> {
   const fetcher = opts?.fetcher ?? fetch;
   const maxAttempts = opts?.maxAttempts ?? 4;
+  const session = getSession();
+  await session.ensureLoggedIn(fetcher);
+
   const params = new URLSearchParams({
     action: "cargoquery",
     format: "json",
@@ -77,10 +199,15 @@ export async function cargoQuery(
       await new Promise((r) => setTimeout(r, backoff));
     }
     try {
+      const cookieHeader = session.cookieHeader();
       const res = await fetcher(url, {
-        headers: { "User-Agent": USER_AGENT },
+        headers: {
+          "User-Agent": USER_AGENT,
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        },
         cache: "no-store",
       });
+      session.ingest(res);
 
       if (res.status === 429 || res.status >= 500) {
         lastErr = new CargoError(
@@ -98,7 +225,7 @@ export async function cargoQuery(
 
       const json = (await res.json()) as CargoResponse;
       if (json.error) {
-        // `ratelimited` (Cargo's own throttle, not HTTP 429) — retry.
+        // 'ratelimited' (Cargo's own throttle, not HTTP 429) — retry.
         if (json.error.code === "ratelimited") {
           lastErr = new CargoError(
             `Cargo ratelimited (retrying): ${json.error.info}`,
@@ -113,7 +240,6 @@ export async function cargoQuery(
       }
       return (json.cargoquery ?? []).map((r) => r.title);
     } catch (err) {
-      // Sieciowe — retry. Bizn. (CargoError z 4xx innym niż 429) — propaguj.
       if (err instanceof CargoError && err.status < 500 && err.status !== 429) {
         throw err;
       }
@@ -126,8 +252,8 @@ export async function cargoQuery(
 }
 
 /**
- * Paginowany Cargo query — łączy strony po `CARGO_LIMIT` aż do wyczerpania
- * lub osiągnięcia maxRows.
+ * Paginowany Cargo query — łączy strony po CARGO_LIMIT do wyczerpania
+ * lub maxRows.
  */
 export async function cargoPaginated(
   q: CargoQuery,
@@ -153,7 +279,7 @@ export class CargoError extends Error {
   }
 }
 
-// --- Pomocniki konwersji wartości -----------------------------------------
+// --- Konwersje wartości ----------------------------------------------------
 
 export function toInt(value: unknown): number {
   if (typeof value === "number") return Math.trunc(value);

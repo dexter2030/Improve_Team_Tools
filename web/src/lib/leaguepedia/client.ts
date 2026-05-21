@@ -18,6 +18,7 @@ import {
   cargoQuery,
   cargoEscape,
   CargoRow,
+  getCargoAuthState,
   toInt,
   toBool,
   toStr,
@@ -51,12 +52,37 @@ export class LeaguepediaClient {
     this.fetcher = opts.fetcher ?? fetch;
   }
 
-  /** Statyczny opis trybu auth — anon-only w MVP. */
+  /** Aktualny tryb auth na podstawie stanu sesji w cargo.ts. */
   authStatus(): AuthStatus {
+    const state = getCargoAuthState();
+    if (state === "bot") {
+      return {
+        level: "ok",
+        message:
+          "Leaguepedia: zalogowano bot-passwordem — podwyższony limit API.",
+      };
+    }
+    if (state === "error") {
+      return {
+        level: "warn",
+        message:
+          "Leaguepedia: logowanie bot-passwordem nie powiodło się — sprawdź LEAGUEPEDIA_USERNAME / LEAGUEPEDIA_PASSWORD.",
+      };
+    }
+    const hasCreds = !!(
+      process.env.LEAGUEPEDIA_USERNAME && process.env.LEAGUEPEDIA_PASSWORD
+    );
+    if (hasCreds) {
+      return {
+        level: "info",
+        message:
+          "Leaguepedia: bot-password skonfigurowany — logowanie nastąpi przy pierwszym fetchu.",
+      };
+    }
     return {
       level: "warn",
       message:
-        "Leaguepedia: tryb anonimowy — niski limit API. Bot-password (LEAGUEPEDIA_USERNAME/PASSWORD) zostanie podłączony w kolejnej iteracji.",
+        "Leaguepedia: tryb anonimowy — niski limit API. Dodaj LEAGUEPEDIA_USERNAME / LEAGUEPEDIA_PASSWORD do env.",
     };
   }
 
