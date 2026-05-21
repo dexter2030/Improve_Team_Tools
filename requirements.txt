@@ -1,0 +1,12 @@
+streamlit
+pandas
+numpy
+riotwatcher
+mwclient
+tenacity
+python-dotenv
+requests
+PyYAML
+tqdm
+beautifulsoup4
+lxml

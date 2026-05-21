@@ -1,0 +1,32 @@
+# Konfiguracja pipeline'u scoutingowego.
+# Edytuj listę lig / progi / liczbę meczów bez ruszania kodu.
+
+leagues:
+  - LFL
+  - Prime League
+  - Superliga
+  - NLC
+  - Ultraliga
+  - EM            # EMEA Masters skrót używany na Leaguepedia (zmień jeśli inne)
+  - LEC
+
+# Pełny okres "aktywności" liczony wstecz od dziś.
+active_since_months: 12
+
+# Co ile dni odświeżamy snapshot soloQ danego gracza.
+days_stale: 7
+
+# Ile ostatnich meczów rankingowych liczymy do średnich.
+matches_per_player: 20
+
+# RANKED_SOLO_5x5 = 420 w Riot API.
+queue_ranked_solo: 420
+
+http:
+  user_agent: "gem-finder/0.1 (scouting pipeline; contact: dexter2030)"
+  # Sekundy między requestami do lolpros.gg — grzecznie i sekwencyjnie.
+  lolpros_delay_seconds: 1.5
+
+paths:
+  database: scouting.db
+  log: scout.log

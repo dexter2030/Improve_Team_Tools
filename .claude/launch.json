@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lol-dashboard",
+      "runtimeExecutable": "C:/Users/micha/Desktop/Cloude/Sessions/venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "streamlit",
+        "run",
+        "app/main.py",
+        "--server.headless",
+        "true",
+        "--server.port",
+        "8501",
+        "--server.address",
+        "127.0.0.1",
+        "--browser.gatherUsageStats",
+        "false"
+      ],
+      "port": 8501
+    }
+  ]
+}
