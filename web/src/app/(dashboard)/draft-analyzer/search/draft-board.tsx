@@ -2,9 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Plus, X, RotateCcw, Search } from "lucide-react";
+import { Plus, X, RotateCcw } from "lucide-react";
 import { ChampionPicker } from "./champion-picker";
 import type { ChampionMeta } from "@/lib/drafts/champion-icons";
 
@@ -117,11 +116,9 @@ function toUrl(state: BoardState): URLSearchParams {
 export function DraftBoard({
   champions,
   iconByName,
-  initialMatches,
 }: {
   champions: ChampionMeta[];
   iconByName: Record<string, string>;
-  initialMatches: number;
 }) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -166,15 +163,15 @@ export function DraftBoard({
     startTransition(() => {
       router.replace(
         newSp.toString()
-          ? `/draft-analyzer/board?${newSp.toString()}`
-          : "/draft-analyzer/board"
+          ? `/draft-analyzer/search?${newSp.toString()}`
+          : "/draft-analyzer/search"
       );
     });
   }
 
   function reset() {
     setState(emptyState());
-    startTransition(() => router.replace("/draft-analyzer/board"));
+    startTransition(() => router.replace("/draft-analyzer/search"));
   }
 
   // Wszystkie wybrane (do "used" dla pickera — same champion nie powinien być dwa razy).
@@ -185,7 +182,6 @@ export function DraftBoard({
   ].filter(Boolean);
 
   const hasAnything = used.length > 0;
-  const searchUrl = `/draft-analyzer/search?${toUrl(state).toString()}`;
 
   return (
     <div className="space-y-4">
@@ -195,28 +191,12 @@ export function DraftBoard({
             Klikaj sloty żeby ustawić championy. Stan w URL — można udostępniać.
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {hasAnything && (
-            <>
-              <Button variant="outline" size="sm" onClick={reset}>
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                Reset
-              </Button>
-              <Link
-                href={searchUrl}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:opacity-90"
-              >
-                <Search className="h-3.5 w-3.5" />
-                Pokaż pasujące drafty
-                {initialMatches > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-primary-foreground/20 rounded">
-                    {initialMatches}
-                  </span>
-                )}
-              </Link>
-            </>
-          )}
-        </div>
+        {hasAnything && (
+          <Button variant="outline" size="sm" onClick={reset}>
+            <RotateCcw className="h-3.5 w-3.5 mr-1" />
+            Reset
+          </Button>
+        )}
       </div>
 
       <div className="rounded-xl border bg-card overflow-hidden">

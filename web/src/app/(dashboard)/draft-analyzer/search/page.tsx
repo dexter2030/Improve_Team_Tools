@@ -22,9 +22,9 @@ import {
   isPatternEmpty,
   type DraftPattern,
 } from "@/lib/drafts/analyzer";
-import { allChampions } from "@/lib/drafts/champion-icons";
+import { allChampionsMeta } from "@/lib/drafts/champion-icons";
 import { ChampionIcon } from "@/components/champion-cell";
-import { SearchGrid } from "./search-grid";
+import { DraftBoard } from "./draft-board";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +37,12 @@ export default async function DraftSearchPage({ searchParams }: Props) {
   const pattern = parsePattern(sp);
 
   const [allDraftsList, champions] = await Promise.all([
-    getAllDrafts(),
-    allChampions(),
+    safeGetDrafts(),
+    allChampionsMeta(),
   ]);
+
+  const iconByName: Record<string, string> = {};
+  for (const c of champions) iconByName[c.name] = c.iconUrl;
 
   const matches = searchDrafts(allDraftsList, pattern);
   const suggestions = !isPatternEmpty(pattern)
@@ -75,7 +78,19 @@ export default async function DraftSearchPage({ searchParams }: Props) {
         </Alert>
       )}
 
-      <SearchGrid champions={champions} initial={pattern} />
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Draft Board</CardTitle>
+          <CardDescription>
+            Klikaj sloty żeby ustawić championy. Kolejność wierszy odpowiada
+            kolejności wyborów w prawdziwym pro drafcie (rose = bany,
+            emerald = picki).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DraftBoard champions={champions} iconByName={iconByName} />
+        </CardContent>
+      </Card>
 
       {!isPatternEmpty(pattern) && (
         <>
@@ -179,6 +194,14 @@ export default async function DraftSearchPage({ searchParams }: Props) {
       )}
     </div>
   );
+}
+
+async function safeGetDrafts() {
+  try {
+    return await getAllDrafts();
+  } catch {
+    return [];
+  }
 }
 
 function parsePattern(sp: Record<string, string | undefined>): DraftPattern {

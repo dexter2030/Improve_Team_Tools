@@ -203,20 +203,12 @@ function Header() {
           co pozwala udostępniać widoki.
         </p>
       </div>
-      <div className="flex items-center gap-2">
-        <a
-          href="/draft-analyzer/board"
-          className={buttonVariants({ variant: "default" })}
-        >
-          🎯 Draft Board
-        </a>
-        <a
-          href="/draft-analyzer/search"
-          className={buttonVariants({ variant: "outline" })}
-        >
-          🔍 Search wzorca
-        </a>
-      </div>
+      <a
+        href="/draft-analyzer/search"
+        className={buttonVariants({ variant: "default" })}
+      >
+        🎯 Wyszukiwarka draftów
+      </a>
     </div>
   );
 }
