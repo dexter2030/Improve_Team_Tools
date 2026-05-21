@@ -34,15 +34,20 @@ export async function countAllDrafts(): Promise<number> {
   return (result[0]?.n as number) ?? 0;
 }
 
-/** Distinct patches w bazie, posortowane malejąco (najnowsze pierwsze). */
+/**
+ * Distinct patches w bazie, posortowane MALEJĄCO numerycznie (najnowsze pierwsze).
+ * SQL ORDER BY na string daje leksykograficznie ("9.6" > "9.16"); sortujemy
+ * po stronie kodu po sortPatchesDesc() która rozumie format Riot patchy.
+ */
 export async function distinctPatches(): Promise<string[]> {
   const rows = await db.execute(sql`
     SELECT DISTINCT ${drafts.patch} AS patch
     FROM ${drafts}
     WHERE ${drafts.patch} IS NOT NULL
-    ORDER BY patch DESC
   `);
-  return rows.map((r) => r.patch as string);
+  const list = rows.map((r) => r.patch as string);
+  const { sortPatchesDesc } = await import("./analyzer");
+  return sortPatchesDesc(list);
 }
 
 /** Bulk upsert draftów. Idempotentne — ten sam matchId nadpisuje stary wiersz. */

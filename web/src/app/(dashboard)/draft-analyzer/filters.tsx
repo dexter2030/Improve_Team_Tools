@@ -70,9 +70,33 @@ export function Filters({ patches }: { patches: string[] }) {
 
       {patches.length > 0 && (
         <div className="space-y-2">
-          <div className="text-sm font-medium">Patche:</div>
+          <div className="flex items-center gap-2 text-sm font-medium flex-wrap">
+            Presety patchy:
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => update("patch", patches.slice(0, 5))}
+            >
+              Ostatnie 5
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => update("patch", patches.slice(0, 10))}
+            >
+              Ostatnie 10
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => update("patch", [])}
+            >
+              Wszystkie patche
+            </Button>
+          </div>
+
           <div className="flex flex-wrap gap-1.5">
-            {patches.slice(0, 24).map((p) => (
+            {patches.map((p) => (
               <button
                 key={p}
                 onClick={() => toggle("patch", p)}
