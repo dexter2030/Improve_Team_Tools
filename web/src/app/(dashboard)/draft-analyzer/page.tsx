@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { buttonVariants } from "@/components/ui/button";
 import { Info } from "lucide-react";
 import { Filters } from "./filters";
 import { ChampionCell, ChampionIcon } from "@/components/champion-cell";
@@ -194,12 +195,20 @@ function renderWinner(
 
 function Header() {
   return (
-    <div>
-      <h2 className="text-2xl font-semibold tracking-tight">Draft Analyzer</h2>
-      <p className="text-sm text-muted-foreground mt-1">
-        Statystyki pick &amp; ban na danych z Leaguepedia. Filtry zmieniają URL,
-        co pozwala udostępniać widoki.
-      </p>
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <h2 className="text-2xl font-semibold tracking-tight">Draft Analyzer</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Statystyki pick &amp; ban na danych z Leaguepedia. Filtry zmieniają URL,
+          co pozwala udostępniać widoki.
+        </p>
+      </div>
+      <a
+        href="/draft-analyzer/search"
+        className={buttonVariants({ variant: "default" })}
+      >
+        🔍 Wyszukiwarka wzorców
+      </a>
     </div>
   );
 }

@@ -78,3 +78,24 @@ export async function iconUrls(
       : null;
   });
 }
+
+/** Lista wszystkich championów (display name) — do autocomplete/select w UI. */
+export async function allChampions(): Promise<string[]> {
+  try {
+    const versionsRes = await fetch(VERSIONS_URL, { next: { revalidate: 86400 } });
+    const versions = (await versionsRes.json()) as string[];
+    const version = versions[0];
+    const champRes = await fetch(
+      `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`,
+      { next: { revalidate: 86400 } }
+    );
+    const data = (await champRes.json()) as {
+      data: Record<string, { name: string }>;
+    };
+    return Object.values(data.data)
+      .map((c) => c.name)
+      .sort();
+  } catch {
+    return [];
+  }
+}
