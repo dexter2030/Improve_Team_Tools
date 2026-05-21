@@ -121,6 +121,63 @@ export const apiCache = pgTable(
   (t) => [index("api_cache_expires_idx").on(t.expiresAt)]
 );
 
+// --- drafts (pick & ban historical data) ------------------------------------
+
+/**
+ * Jeden wiersz = jedna pro gra. Sekwencja draftu rozbita na 10 kolumn pick
+ * (B1/R1/R2/B2/B3/R3/B4/B5/R4/R5 — convention Leaguepedia gdzie Team1=Blue).
+ * Bany jako tablice tekstu (kolejność zachowana, ale przy match jako zbiór
+ * per faza). winner = nazwa drużyny lub NULL (np. mecze toczące się).
+ */
+export const drafts = pgTable(
+  "drafts",
+  {
+    matchId: text("match_id").primaryKey(),
+    patch: text("patch"),
+    league: text("league").notNull(),
+    gameDate: timestamp("game_date", { withTimezone: true }),
+    blueTeam: text("blue_team"),
+    redTeam: text("red_team"),
+    blueBans: jsonb("blue_bans").$type<string[]>().notNull().default([]),
+    redBans: jsonb("red_bans").$type<string[]>().notNull().default([]),
+    b1Pick: text("b1_pick"),
+    r1Pick: text("r1_pick"),
+    r2Pick: text("r2_pick"),
+    b2Pick: text("b2_pick"),
+    b3Pick: text("b3_pick"),
+    r3Pick: text("r3_pick"),
+    b4Pick: text("b4_pick"),
+    b5Pick: text("b5_pick"),
+    r4Pick: text("r4_pick"),
+    r5Pick: text("r5_pick"),
+    winner: text("winner"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("drafts_league_idx").on(t.league),
+    index("drafts_patch_idx").on(t.patch),
+    index("drafts_b1_idx").on(t.b1Pick),
+    index("drafts_game_date_idx").on(t.gameDate),
+  ]
+);
+
+// --- league_sync (incremental sync cursor + remote totals) ------------------
+
+export const leagueSync = pgTable("league_sync", {
+  league: text("league").primaryKey(),
+  lastFetched: timestamp("last_fetched", { withTimezone: true }),
+  lastGameDate: timestamp("last_game_date", { withTimezone: true }),
+  remoteTotal: integer("remote_total"),
+  remoteChecked: timestamp("remote_checked", { withTimezone: true }),
+});
+
+export type Draft = typeof drafts.$inferSelect;
+export type NewDraft = typeof drafts.$inferInsert;
+export type LeagueSync = typeof leagueSync.$inferSelect;
+export type NewLeagueSync = typeof leagueSync.$inferInsert;
+
 // --- Typy ze schemy (do użycia w Server Actions / Components) ---------------
 
 export type ScoutingProfile = typeof scoutingProfiles.$inferSelect;
