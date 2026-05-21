@@ -34,7 +34,7 @@ export const LEAGUE_GROUPS = {
   ],
 } as const;
 
-export const ALL_LEAGUES = [
+export const ALL_LEAGUES: readonly string[] = [
   ...LEAGUE_GROUPS.tier1,
   ...LEAGUE_GROUPS.erlD1,
   ...LEAGUE_GROUPS.erlD2,

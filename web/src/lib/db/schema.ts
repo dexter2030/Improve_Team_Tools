@@ -212,6 +212,48 @@ export const lpPlayersSync = pgTable("lp_players_sync", {
 export type LpPlayer = typeof lpPlayersAll.$inferSelect;
 export type NewLpPlayer = typeof lpPlayersAll.$inferInsert;
 
+// --- lp_tournament_players (per-liga rostery z TournamentPlayers) ----------
+
+/**
+ * Każdy wiersz = jeden gracz w jednej lidze (jedna z Tier 1 / ERL).
+ * Klucz złożony: (overviewPage, league) — ten sam gracz może być
+ * obecny w wielu ligach przez sezony.
+ */
+export const lpTournamentPlayers = pgTable(
+  "lp_tournament_players",
+  {
+    overviewPage: text("overview_page").notNull(),
+    league: text("league").notNull(),
+    id: text("id"),
+    team: text("team"),
+    role: text("role"),
+    country: text("country"),
+    nationalityPrimary: text("nationality_primary"),
+    lastTournament: text("last_tournament"),
+    lastTournamentStart: timestamp("last_tournament_start", { withTimezone: true }),
+    syncedAt: timestamp("synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // Compound PK (Drizzle: primaryKey via index).
+    unique("lp_tournament_players_pk").on(t.overviewPage, t.league),
+    index("lp_tp_league_idx").on(t.league),
+    index("lp_tp_role_idx").on(t.role),
+    index("lp_tp_team_idx").on(t.team),
+  ]
+);
+
+/** Per-league sync state — kiedy ostatnio pobrane, ile graczy. */
+export const lpTournamentPlayersSync = pgTable("lp_tournament_players_sync", {
+  league: text("league").primaryKey(),
+  lastFetched: timestamp("last_fetched", { withTimezone: true }),
+  count: integer("count"),
+});
+
+export type LpTournamentPlayer = typeof lpTournamentPlayers.$inferSelect;
+export type NewLpTournamentPlayer = typeof lpTournamentPlayers.$inferInsert;
+
 // --- Typy ze schemy (do użycia w Server Actions / Components) ---------------
 
 export type ScoutingProfile = typeof scoutingProfiles.$inferSelect;

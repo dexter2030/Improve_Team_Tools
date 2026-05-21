@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -14,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   countPlayers,
   distinctCountries,
@@ -81,12 +83,20 @@ export default async function PlayersDataPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Players Data</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Globalna baza graczy z Leaguepedia (~30k wpisów). Pobieranie zajmuje
-          chwilę — następne odświeżanie aktualizuje rostery po transferach.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Players Data</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Globalna baza graczy z Leaguepedia (~30k wpisów). Pobieranie zajmuje
+            chwilę — następne odświeżanie aktualizuje rostery po transferach.
+          </p>
+        </div>
+        <Link
+          href="/players-data/league"
+          className={buttonVariants({ variant: "outline" })}
+        >
+          🏆 Tryb per liga →
+        </Link>
       </div>
 
       <SyncBar count={total} lastFetched={syncState?.lastFetched ?? null} />

@@ -22,6 +22,13 @@
       "when": 1779392617358,
       "tag": "0002_lp_players",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779395939875,
+      "tag": "0003_lp_tournament_players",
+      "breakpoints": true
     }
   ]
 }
