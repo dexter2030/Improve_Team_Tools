@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import {
   Card,
   CardContent,
@@ -9,10 +10,13 @@ import {
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { getProfile } from "@/lib/profiles/repository";
 import { ProfileActions } from "./profile-actions";
 import { NotesEditor } from "./notes-editor";
+import { RankedPanel } from "./ranked-panel";
+import { ChampionPoolPanel } from "./champion-pool-panel";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +70,34 @@ export default async function ProfileDetailPage({ params }: Props) {
           value={profile.proplay?.verified ? "verified" : "—"}
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ranked stats</CardTitle>
+          <CardDescription>
+            Live z Riot League-V4. Cache: 1h (LP/tier zmienia się w trakcie gry).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+            <RankedPanel accounts={profile.soloq} />
+          </Suspense>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Champion pool (pro play)</CardTitle>
+          <CardDescription>
+            Agregacja per champion z Leaguepedia ScoreboardPlayers. Cache 6h.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<Skeleton className="h-48 w-full" />}>
+            <ChampionPoolPanel proplay={profile.proplay} />
+          </Suspense>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
