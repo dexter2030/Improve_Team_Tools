@@ -18,15 +18,29 @@ export async function countPlayers(): Promise<number> {
   return (r[0]?.n as number) ?? 0;
 }
 
+export type SortColumn = "id" | "role" | "team" | "country" | "isRetired";
+export type SortDir = "asc" | "desc";
+
 export interface PlayerFilters {
   role?: string;
   country?: string;
   search?: string;
   hideRetired?: boolean;
-  limit?: number;
+  sortBy?: SortColumn;
+  sortDir?: SortDir;
+  page?: number; // 1-based
+  pageSize?: number;
 }
 
-export async function listPlayers(f: PlayerFilters = {}): Promise<LpPlayer[]> {
+export interface PaginatedPlayers {
+  rows: LpPlayer[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+function buildWhere(f: PlayerFilters) {
   const conditions: ReturnType<typeof sql>[] = [];
   if (f.role) conditions.push(sql`${lpPlayersAll.role} = ${f.role}`);
   if (f.country) conditions.push(sql`${lpPlayersAll.country} = ${f.country}`);
@@ -37,18 +51,50 @@ export async function listPlayers(f: PlayerFilters = {}): Promise<LpPlayer[]> {
       sql`(${lpPlayersAll.id} ILIKE ${term} OR ${lpPlayersAll.team} ILIKE ${term} OR ${lpPlayersAll.overviewPage} ILIKE ${term})`
     );
   }
+  return conditions.length === 0 ? sql`TRUE` : sql.join(conditions, sql` AND `);
+}
 
-  const where =
-    conditions.length === 0
-      ? sql`TRUE`
-      : sql.join(conditions, sql` AND `);
+const COLUMN_MAP = {
+  id: lpPlayersAll.id,
+  role: lpPlayersAll.role,
+  team: lpPlayersAll.team,
+  country: lpPlayersAll.country,
+  isRetired: lpPlayersAll.isRetired,
+} as const;
 
-  return db
-    .select()
-    .from(lpPlayersAll)
-    .where(where)
-    .orderBy(lpPlayersAll.id)
-    .limit(f.limit ?? 500);
+export async function listPlayersPaginated(
+  f: PlayerFilters = {}
+): Promise<PaginatedPlayers> {
+  const pageSize = f.pageSize ?? 100;
+  const page = Math.max(1, f.page ?? 1);
+  const offset = (page - 1) * pageSize;
+  const where = buildWhere(f);
+
+  const sortCol = COLUMN_MAP[f.sortBy ?? "id"];
+  const orderClause =
+    f.sortDir === "desc"
+      ? sql`${sortCol} DESC NULLS LAST`
+      : sql`${sortCol} ASC NULLS LAST`;
+
+  const [rows, totalRow] = await Promise.all([
+    db
+      .select()
+      .from(lpPlayersAll)
+      .where(where)
+      .orderBy(orderClause)
+      .limit(pageSize)
+      .offset(offset),
+    db.execute(sql`SELECT COUNT(*)::int AS n FROM ${lpPlayersAll} WHERE ${where}`),
+  ]);
+
+  const total = (totalRow[0]?.n as number) ?? 0;
+  return {
+    rows,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }
 
 export async function distinctRoles(): Promise<string[]> {

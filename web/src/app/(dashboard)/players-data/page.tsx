@@ -19,10 +19,14 @@ import {
   distinctCountries,
   distinctRoles,
   getSyncState,
-  listPlayers,
+  listPlayersPaginated,
+  type SortColumn,
+  type SortDir,
 } from "@/lib/players/repository";
 import { SyncBar } from "./sync-bar";
 import { PlayersFilters } from "./filters";
+import { Pagination } from "./pagination";
+import { SortHeader } from "./sort-header";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +36,8 @@ interface Props {
     country?: string;
     search?: string;
     hideRetired?: string;
+    sort?: string;
+    page?: string;
   }>;
 }
 
@@ -41,6 +47,14 @@ export default async function PlayersDataPage({ searchParams }: Props) {
   const country = sp.country || undefined;
   const search = sp.search || undefined;
   const hideRetired = sp.hideRetired === "1";
+  const page = sp.page ? Math.max(1, Number(sp.page) || 1) : 1;
+  const [sortColRaw, sortDirRaw] = (sp.sort ?? "").split(":");
+  const sortBy = (
+    ["id", "role", "team", "country", "isRetired"] as SortColumn[]
+  ).includes(sortColRaw as SortColumn)
+    ? (sortColRaw as SortColumn)
+    : "id";
+  const sortDir: SortDir = sortDirRaw === "desc" ? "desc" : "asc";
 
   const [total, syncState, roles, countries] = await Promise.all([
     countPlayers(),
@@ -49,10 +63,21 @@ export default async function PlayersDataPage({ searchParams }: Props) {
     distinctCountries(),
   ]);
 
-  const players =
+  const pageSize = 100;
+  const paginated =
     total > 0
-      ? await listPlayers({ role, country, search, hideRetired, limit: 500 })
-      : [];
+      ? await listPlayersPaginated({
+          role,
+          country,
+          search,
+          hideRetired,
+          page,
+          pageSize,
+          sortBy,
+          sortDir,
+        })
+      : { rows: [], total: 0, page: 1, pageSize, totalPages: 1 };
+  const players = paginated.rows;
 
   return (
     <div className="space-y-6">
@@ -71,8 +96,9 @@ export default async function PlayersDataPage({ searchParams }: Props) {
           <CardHeader>
             <CardTitle>Filtry</CardTitle>
             <CardDescription>
-              Pokazuję pierwsze 500 wyników. Zaw  ęź filtry żeby znaleźć
-              konkretnego gracza.
+              {paginated.total.toLocaleString("pl-PL")} graczy spełnia filtry
+              (z {total.toLocaleString("pl-PL")} w bazie). Kliknij nagłówek
+              kolumny żeby posortować.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -93,12 +119,22 @@ export default async function PlayersDataPage({ searchParams }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nick</TableHead>
-                  <TableHead>Rola</TableHead>
-                  <TableHead>Drużyna</TableHead>
-                  <TableHead>Kraj</TableHead>
+                  <TableHead>
+                    <SortHeader column="id" label="Nick" />
+                  </TableHead>
+                  <TableHead>
+                    <SortHeader column="role" label="Rola" />
+                  </TableHead>
+                  <TableHead>
+                    <SortHeader column="team" label="Drużyna" />
+                  </TableHead>
+                  <TableHead>
+                    <SortHeader column="country" label="Kraj" />
+                  </TableHead>
                   <TableHead>Rezydencja</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>
+                    <SortHeader column="isRetired" label="Status" />
+                  </TableHead>
                   <TableHead>Leaguepedia</TableHead>
                 </TableRow>
               </TableHeader>
@@ -135,6 +171,12 @@ export default async function PlayersDataPage({ searchParams }: Props) {
                 ))}
               </TableBody>
             </Table>
+            <Pagination
+              page={paginated.page}
+              totalPages={paginated.totalPages}
+              total={paginated.total}
+              pageSize={paginated.pageSize}
+            />
           </CardContent>
         </Card>
       )}
