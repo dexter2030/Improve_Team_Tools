@@ -1,8 +1,9 @@
 /**
- * Edge middleware — chroni cały dashboard za hasłem.
+ * Edge proxy — chroni cały dashboard za hasłem.
  *
- * UWAGA: Edge runtime nie ma `node:crypto`. Robimy weryfikację tutaj
- * używając WebCrypto API. Brak APP_PASSWORD w env = auth wyłączony.
+ * Next.js 16 zmienił nazwę z `middleware.ts` na `proxy.ts` (z `middleware()`
+ * na `proxy()`). Edge runtime nie ma `node:crypto`, więc weryfikujemy HMAC
+ * przez WebCrypto API. Brak APP_PASSWORD w env = auth wyłączony.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,7 +14,7 @@ const COOKIE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 // Te ścieżki nie wymagają auth.
 const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout"];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const password = process.env.APP_PASSWORD;
   if (!password) return NextResponse.next(); // auth wyłączony
 
