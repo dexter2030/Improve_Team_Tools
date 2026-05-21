@@ -10,6 +10,7 @@ import {
   LineChart,
   Trophy,
   Settings,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -60,8 +61,19 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="px-4 py-3 border-t border-sidebar-border text-xs text-muted-foreground">
-        Live data — Riot API & Leaguepedia
+      <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
+        <form action="/api/auth/logout" method="post">
+          <button
+            type="submit"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent/60 text-sidebar-foreground/80 transition-colors"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span>Wyloguj</span>
+          </button>
+        </form>
+        <p className="px-3 text-[10px] text-muted-foreground">
+          Live data — Riot API &amp; Leaguepedia
+        </p>
       </div>
     </aside>
   );
