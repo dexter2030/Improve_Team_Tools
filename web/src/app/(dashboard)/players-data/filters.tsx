@@ -37,14 +37,14 @@ export function PlayersFilters({
     router.push(`/players-data?${next.toString()}`);
   }
 
-  function updateRole(value: string) {
+  function updateRole(value: string | null) {
     const next = new URLSearchParams(sp.toString());
     if (value === PLAYERS_ONLY) {
       next.delete("role");
       next.set("playerRolesOnly", "1");
     } else {
       next.delete("playerRolesOnly");
-      if (value === ALL) next.delete("role");
+      if (!value || value === ALL) next.delete("role");
       else next.set("role", value);
     }
     router.push(`/players-data?${next.toString()}`);
