@@ -21,8 +21,12 @@ export async function countPlayers(): Promise<number> {
 export type SortColumn = "id" | "role" | "team" | "country" | "isRetired";
 export type SortDir = "asc" | "desc";
 
+export const PLAYER_ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"] as const;
+
 export interface PlayerFilters {
   role?: string;
+  /** Restrict to the 5 gameplay roles (Top/Jungle/Mid/Bot/Support). Ignored when `role` is set. */
+  playerRolesOnly?: boolean;
   country?: string;
   search?: string;
   hideRetired?: boolean;
@@ -42,7 +46,16 @@ export interface PaginatedPlayers {
 
 function buildWhere(f: PlayerFilters) {
   const conditions: ReturnType<typeof sql>[] = [];
-  if (f.role) conditions.push(sql`${lpPlayersAll.role} = ${f.role}`);
+  if (f.role) {
+    conditions.push(sql`${lpPlayersAll.role} = ${f.role}`);
+  } else if (f.playerRolesOnly) {
+    conditions.push(
+      sql`${lpPlayersAll.role} IN (${sql.join(
+        PLAYER_ROLES.map((r) => sql`${r}`),
+        sql`, `
+      )})`
+    );
+  }
   if (f.country) conditions.push(sql`${lpPlayersAll.country} = ${f.country}`);
   if (f.hideRetired) conditions.push(sql`${lpPlayersAll.isRetired} = false`);
   if (f.search) {

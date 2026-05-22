@@ -35,6 +35,7 @@ export const dynamic = "force-dynamic";
 interface Props {
   searchParams: Promise<{
     role?: string;
+    playerRolesOnly?: string;
     country?: string;
     search?: string;
     hideRetired?: string;
@@ -46,6 +47,7 @@ interface Props {
 export default async function PlayersDataPage({ searchParams }: Props) {
   const sp = await searchParams;
   const role = sp.role || undefined;
+  const playerRolesOnly = sp.playerRolesOnly === "1";
   const country = sp.country || undefined;
   const search = sp.search || undefined;
   const hideRetired = sp.hideRetired === "1";
@@ -70,6 +72,7 @@ export default async function PlayersDataPage({ searchParams }: Props) {
     total > 0
       ? await listPlayersPaginated({
           role,
+          playerRolesOnly,
           country,
           search,
           hideRetired,
