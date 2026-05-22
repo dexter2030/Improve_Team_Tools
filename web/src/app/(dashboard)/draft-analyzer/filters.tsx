@@ -53,6 +53,13 @@ export function Filters({ patches }: { patches: string[] }) {
           <Button size="xs" variant="outline" onClick={() => preset([...LEAGUE_GROUPS.tier1, ...LEAGUE_GROUPS.erlD1])}>
             + ERL D1
           </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => preset([...LEAGUE_GROUPS.tier1, ...LEAGUE_GROUPS.erlD1, ...LEAGUE_GROUPS.erlD2])}
+          >
+            All
+          </Button>
           <Button size="xs" variant="outline" onClick={clear}>
             Clear
           </Button>
