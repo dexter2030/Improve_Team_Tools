@@ -31,7 +31,7 @@ export function SyncButton({
   return (
     <Button onClick={sync} disabled={pending} size="sm" variant={hasData ? "outline" : "default"}>
       {pending ? (
-        "Loading..."
+        "Fetching..."
       ) : hasData ? (
         <>
           <RefreshCw className="h-3.5 w-3.5 mr-1" />
@@ -40,7 +40,7 @@ export function SyncButton({
       ) : (
         <>
           <Download className="h-3.5 w-3.5 mr-1" />
-          Load
+          Fetch
         </>
       )}
     </Button>

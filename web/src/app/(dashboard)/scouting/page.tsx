@@ -76,7 +76,7 @@ export default async function ScoutingListPage({ searchParams }: Props) {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Tracked players</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Watched players with resolved SoloQ and pro-play identities.
+            With resolved SoloQ and pro-play identities.
           </p>
         </div>
         <div className="flex items-center gap-2">

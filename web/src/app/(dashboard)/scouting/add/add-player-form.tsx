@@ -60,7 +60,6 @@ export function AddPlayerForm() {
           <Input
             id="displayName"
             name="displayName"
-            placeholder="Display name"
             required
           />
         </div>
@@ -95,7 +94,7 @@ export function AddPlayerForm() {
 
         <div className="space-y-2">
           <Label htmlFor="nationality">Country</Label>
-          <Input id="nationality" name="nationality" placeholder="e.g. Poland" />
+          <Input id="nationality" name="nationality" placeholder="e.g., Poland" />
         </div>
 
         <div className="space-y-2 md:col-span-2">

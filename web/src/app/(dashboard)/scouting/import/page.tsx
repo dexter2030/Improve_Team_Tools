@@ -22,7 +22,7 @@ export default function ImportPage() {
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           Paste data from Excel / Google Sheets. One row = one player,
-          auto-verified against Riot + Leaguepedia. Per-row errors don&apos;t block the rest.
+          auto-verified against Riot + Leaguepedia. Per-row errors don&rsquo;t block the rest.
         </p>
       </div>
 

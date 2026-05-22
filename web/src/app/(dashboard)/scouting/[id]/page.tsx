@@ -182,7 +182,7 @@ export default async function ProfileDetailPage({ params }: Props) {
         <CardHeader>
           <CardTitle>Scouting notes</CardTitle>
           <CardDescription>
-            Your observations. Saved on Save.
+            Your observations on this player.
           </CardDescription>
         </CardHeader>
         <CardContent>

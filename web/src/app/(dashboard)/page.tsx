@@ -95,7 +95,7 @@ export default async function Home() {
             <p className="text-xs text-muted-foreground mt-2">
               {draftLeagueSync.length > 0
                 ? `${draftLeagueSync.length} leagues synced`
-                : "No sync — load in Database"}
+                : "No sync — fetch in Database"}
             </p>
           }
         />
@@ -108,7 +108,7 @@ export default async function Home() {
             <p className="text-xs text-muted-foreground mt-2">
               {playersSync?.lastFetched
                 ? `Sync: ${new Date(playersSync.lastFetched).toLocaleDateString("en-US")}`
-                : "First sync ~20s"}
+                : "First fetch ~1-2 min"}
             </p>
           }
         />
@@ -183,7 +183,7 @@ export default async function Home() {
                 <p className="text-xs text-muted-foreground">
                   No syncs.{" "}
                   <Link href="/database" className="text-primary hover:underline">
-                    Load leagues
+                    Fetch leagues
                   </Link>
                 </p>
               ) : (
