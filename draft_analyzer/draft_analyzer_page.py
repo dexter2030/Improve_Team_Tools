@@ -31,8 +31,7 @@ def render():
 
     st.title("🎯 Draft Analyzer")
     st.caption(
-        "Wyszukiwarka historycznych draftów po wzorcu pick&ban "
-        "oraz podgląd całej bazy draftów."
+        "Pick & ban search over historical pro drafts + full draft database view."
     )
 
     # stan zakładki — przeżywa rerun Streamlita
@@ -44,48 +43,46 @@ def render():
         st.session_state.da_patches = []
 
     # ================= SEKCJA 1: pobieranie danych =================
-    with st.expander("⚙️ Dane — pobierz drafty z Leaguepedia", expanded=False):
+    with st.expander("⚙️ Data — fetch drafts from Leaguepedia", expanded=False):
         st.write(
-            "Baza startuje pusta. Pobierz drafty raz, potem odświeżaj "
-            "okresowo — pobieranie jest przyrostowe (dokłada tylko mecze "
-            "nowsze niż ostatnio wczytane, więc tego samego nie ściąga "
-            "się dwa razy). Stan i % kompletności każdej ligi widać "
-            "w zakładce **Database**."
+            "DB starts empty. Fetch once, then refresh periodically — fetch is "
+            "incremental (only matches newer than the last cursor are pulled, "
+            "so nothing is downloaded twice). League sync state and completeness "
+            "% live in the **Database** tab."
         )
         col_a, col_b = st.columns([2, 1])
         league = col_a.text_input(
-            "Liga", value="LEC",
-            help="Jedna liga lub kilka po przecinku — np. LEC, LPL, LCS",
+            "League", value="LEC",
+            help="One league or several comma-separated — e.g., LEC, LPL, LCS",
         )
         season = col_a.text_input(
-            "Filtr sezonu (opcjonalnie)",
+            "Season filter (optional)",
             value="",
-            help="dodatkowy warunek SQL, np. "
+            help="extra SQL-like condition, e.g., "
                  "ScoreboardGames.DateTime_UTC >= '2024-01-01'",
         )
         full_refresh = col_a.checkbox(
-            "Pełne odświeżenie (ignoruj zapamiętany postęp)",
-            help="Domyślnie pobieranie dokłada tylko nowe mecze. "
-                 "Zaznacz, by pobrać wskazane ligi całe od nowa.",
+            "Full refresh (ignore stored cursor)",
+            help="By default fetch only adds new matches. "
+                 "Check to refetch the listed leagues from scratch.",
         )
-        if col_b.button("Pobierz dane", use_container_width=True):
+        if col_b.button("Fetch", use_container_width=True):
             leagues_to_fetch = [s.strip() for s in league.split(",")
                                 if s.strip()]
             if not leagues_to_fetch:
-                st.warning("Podaj przynajmniej jedną ligę.")
+                st.warning("Provide at least one league.")
             else:
                 _run_fetch(leagues_to_fetch, season, full_refresh)
 
     # ================= SEKCJA 2: wyszukiwarka draftów =================
-    st.subheader("1 · Wyszukiwarka draftów")
+    st.subheader("1 · Draft search")
     st.write(
-        "Wpisz championów w sloty draftu — wypełnij tylko te, na których Ci "
-        "zależy. **Picki** dopasowywane są pozycyjnie: slot N po danej "
-        "stronie = N-ty pick draftu tej drużyny. **Bany** trafiają do "
-        "wspólnej puli — strona nie ma znaczenia, ale faza 1 (sloty 1-3) "
-        "i faza 2 (sloty 4-5) są rozdzielone. Przy pustym slocie pick "
-        "kliknij 💡 — pokaże najczęstsze championy na tej dokładnie "
-        "pozycji w pasujących draftach."
+        "Fill draft slots with champions — only the ones you care about. "
+        "**Picks** match positionally: slot N on a side = the Nth pick of that team's "
+        "draft. **Bans** go into a shared pool — side doesn't matter, but phase 1 "
+        "(slots 1-3) and phase 2 (slots 4-5) are separated. For an empty pick slot, "
+        "click 💡 — shows the most frequent champions at that exact position in "
+        "matching drafts."
     )
 
     # Sugestie i wyniki wyszukiwania muszą działać na tym samym zbiorze,
@@ -104,15 +101,15 @@ def render():
 
     # --- filtry zawężające: patch + ligi ---
     st.multiselect(
-        "Filtr patchy (puste = wszystkie)",
+        "Patch filter (empty = all)",
         options=list_patches(),
         key="da_patches",
     )
 
-    st.markdown("**Zakres lig**")
+    st.markdown("**League scope**")
     st.caption(
-        "Presety to szybki start — po kliknięciu listę nadal można "
-        "dowolnie edytować. Puste = wszystkie ligi w bazie."
+        "Presets are a quick start — you can still edit the list after clicking. "
+        "Empty = all leagues in DB."
     )
     preset_cols = st.columns(len(PRESETS))
     for col, (name, leagues_preset) in zip(preset_cols, PRESETS.items()):
@@ -120,17 +117,17 @@ def render():
             st.session_state.da_leagues = list(leagues_preset)
             st.rerun()
     st.multiselect(
-        "Ligi w wyszukiwaniu",
+        "Leagues in search",
         options=all_known_leagues(),
         key="da_leagues",
-        help="Dodaj lub usuń dowolne ligi.",
+        help="Add or remove any leagues.",
     )
 
-    if st.button("🔍 Szukaj draftów", type="primary"):
+    if st.button("🔍 Search drafts", type="primary"):
         flat = (criteria["blue_picks"] + criteria["blue_bans"]
                 + criteria["red_picks"] + criteria["red_bans"])
         if not any(flat):
-            st.warning("Wpisz przynajmniej jednego championa.")
+            st.warning("Enter at least one champion.")
         else:
             st.session_state.da_search = {
                 **criteria,
@@ -147,14 +144,14 @@ def render():
 
     # ================= SEKCJA 4: cała baza =================
     st.divider()
-    st.subheader("3 · Cała baza draftów")
+    st.subheader("3 · Full draft database")
     all_drafts = fetch_all_drafts()
     if not all_drafts:
-        st.info("Baza jest pusta — pobierz dane z Leaguepedia powyżej.")
+        st.info("DB is empty — fetch data from Leaguepedia above.")
     else:
         st.caption(
-            f"{len(all_drafts)} draftów w bazie · kolumny w kolejności "
-            f"draftu (T1 = blue side, T2 = red side)."
+            f"{len(all_drafts)} drafts in DB · columns in draft order "
+            f"(T1 = blue side, T2 = red side)."
         )
         _drafts_wide_table(all_drafts)
 
@@ -171,42 +168,41 @@ def _run_fetch(leagues: list[str], season: str, full_refresh: bool) -> None:
     sync.fetch_league() — tu jest tylko pasek postępu i komunikaty.
     """
     n = len(leagues)
-    bar = st.progress(0.0, text="Łączę się z Leaguepedia…")
+    bar = st.progress(0.0, text="Connecting to Leaguepedia…")
     outcomes = []
     for i, lg in enumerate(leagues):
-        bar.progress(i / n, text=f"Wczytuję {lg}… ({i + 1}/{n})")
+        bar.progress(i / n, text=f"Fetching {lg}… ({i + 1}/{n})")
 
         def on_batch(fetched: int, saved: int, _lg=lg, _i=i) -> None:
-            bar.progress(_i / n, text=f"{_lg}: zapisano {saved} gier")
+            bar.progress(_i / n, text=f"{_lg}: saved {saved} games")
 
         outcomes.append(
             fetch_league(lg, season_where=season,
                          full_refresh=full_refresh, on_batch=on_batch)
         )
-    bar.progress(1.0, text="Gotowe.")
+    bar.progress(1.0, text="Done.")
 
     saved = sum(o.saved for o in outcomes)
     errors = [o for o in outcomes if o.error]
     if errors:
-        st.warning(f"Zapisano {saved} nowych gier, ale część lig zwróciła błąd.")
+        st.warning(f"Saved {saved} new games, but some leagues errored.")
     else:
         st.success(
-            f"Pobrano dane z {n} lig — zapisano {saved} nowych gier "
+            f"Fetched {n} leagues — saved {saved} new games "
             f"({', '.join(leagues)})."
         )
 
     for o in outcomes:
         if o.error:
             st.error(
-                f"⚠️ {o.league}: pobieranie przerwał błąd — {o.error}. "
-                f"Już zapisane gry zostają w bazie; odczekaj minutę "
-                f"i ponów pobieranie (jest idempotentne — dołoży tylko "
-                f"brakujące gry)."
+                f"⚠️ {o.league}: fetch failed — {o.error}. "
+                f"Already-saved games stay in DB; wait a minute and retry "
+                f"(idempotent — only missing games will be added)."
             )
         elif o.truncated:
             st.warning(
-                f"⚠️ {o.league}: osiągnięto limit {o.fetched} wierszy. "
-                f"Zawęź filtrem sezonu, by pobrać starsze mecze."
+                f"⚠️ {o.league}: hit limit of {o.fetched} rows. "
+                f"Narrow by season filter to fetch older matches."
             )
 
 
@@ -298,11 +294,11 @@ def _slot_extra(slot_key: str, is_pick: bool, group_suggestions: list) -> None:
 
 def _render_suggestions(suggestions: list) -> None:
     """Treść popovera: sugerowane championy dla tego slotu + pick rate %."""
-    st.markdown("**Najczęściej w tej sytuacji**")
+    st.markdown("**Most common in this situation**")
     if not suggestions:
         st.caption(
-            "Wpisz championów w inne sloty — sugestie liczone są z draftów "
-            "pasujących do wzorca."
+            "Fill in other slots — suggestions are computed from drafts "
+            "matching the pattern."
         )
         return
     for s in suggestions[:6]:
@@ -321,34 +317,33 @@ def _render_stats_section(drafts: list[dict]) -> None:
     patchy + lig), żeby coach widział meta dla zawężonego regionu /
     okna patchowego. Bez wzorca pick&ban — to po prostu top-listy.
     """
-    st.subheader("2 · Statystyki")
+    st.subheader("2 · Stats")
     st.caption(
-        f"Najczęstsze bany fazy 1 (per strona) oraz first picki — liczone "
-        f"z draftów w aktualnym filtrze patchy + lig ({len(drafts)} "
-        f"draftów). Zmień filtry powyżej, żeby zawęzić do interesującej "
-        f"mety / regionu."
+        f"Most common phase 1 bans (per side) and first picks — from drafts "
+        f"matching the current patch + league filter ({len(drafts)} drafts). "
+        f"Change filters above to narrow to a specific meta or region."
     )
     if not drafts:
-        st.info("Brak draftów w wybranym zakresie filtrów.")
+        st.info("No drafts in the current filter range.")
         return
 
     ban_stats = phase1_ban_stats(drafts, top_n=10)
     col_blue, col_red = st.columns(2)
     with col_blue:
-        st.markdown("**Bany fazy 1 — Blue side** (sloty 1-3)")
+        st.markdown("**Phase 1 bans — Blue side** (slots 1-3)")
         _render_champion_list(ban_stats["blue"])
     with col_red:
-        st.markdown("**Bany fazy 1 — Red side** (sloty 1-3)")
+        st.markdown("**Phase 1 bans — Red side** (slots 1-3)")
         _render_champion_list(ban_stats["red"])
 
-    st.markdown("**Najczęstsze first picki** (pierwszy pick draftu, Blue side)")
+    st.markdown("**Top first picks** (first pick of the draft, Blue side)")
     _render_champion_list(first_pick_stats(drafts, top_n=10))
 
 
 def _render_champion_list(stats: list[dict]) -> None:
     """Lista championów: ikonka + nazwa + % i liczba draftów."""
     if not stats:
-        st.caption("Brak danych.")
+        st.caption("No data.")
         return
     for s in stats:
         c_icon, c_name, c_pct = st.columns(
@@ -358,14 +353,14 @@ def _render_champion_list(stats: list[dict]) -> None:
         if url:
             c_icon.image(url, width=32)
         c_name.markdown(f"**{s['champion']}**")
-        c_pct.caption(f"{s['pct']}% · {s['count']} draftów")
+        c_pct.caption(f"{s['pct']}% · {s['count']} drafts")
 
 
 def _render_search_results(search: dict) -> None:
     """Filtruje bazę wg wzorca pick&ban i renderuje wynik wyszukiwania."""
     drafts = fetch_all_drafts(search["patches"])
     if not drafts:
-        st.info("Baza jest pusta — pobierz dane z Leaguepedia powyżej.")
+        st.info("DB is empty — fetch data from Leaguepedia above.")
         return
 
     drafts = filter_by_leagues(drafts, search["leagues"])
@@ -377,11 +372,11 @@ def _render_search_results(search: dict) -> None:
         red_bans=search["red_bans"],
     )
 
-    st.markdown(f"**Znaleziono draftów: {len(matches)}**")
+    st.markdown(f"**Matches found: {len(matches)}**")
     if not matches:
         st.info(
-            "Brak draftów pasujących do tego wzorca. Spróbuj mniej "
-            "kryteriów albo poszerz filtr lig / patchy."
+            "No drafts match this pattern. Try fewer criteria or widen the "
+            "league / patch filter."
         )
     elif len(matches) == 1:
         _draft_card(matches[0])
@@ -397,8 +392,8 @@ def _draft_card(d: dict) -> None:
     meta = " · ".join(x for x in [
         d.get("league"),
         f"patch {d['patch']}" if d.get("patch") else None,
-        f"data {d['game_date']}" if d.get("game_date") else None,
-        f"zwycięzca: {d['winner']}" if d.get("winner") else None,
+        f"date {d['game_date']}" if d.get("game_date") else None,
+        f"winner: {d['winner']}" if d.get("winner") else None,
     ] if x)
     if meta:
         st.caption(meta)

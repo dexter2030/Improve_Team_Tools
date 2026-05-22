@@ -54,9 +54,9 @@ def render():
 
     st.title("👥 Players Data")
     st.caption(
-        "Baza graczy z Leaguepedia. Dwa tryby: globalnie (cała tabela "
-        "Players, bez podziału na ligi, z filtrami narodowość/rola i "
-        "wskaźnikiem lolpros) oraz per liga (rostery turniejów)."
+        "Leaguepedia player database. Two modes: global (the full Players "
+        "table, no league split, with nationality/role filters and lolpros "
+        "indicator) and per league (tournament rosters)."
     )
 
     auth_level, auth_msg = auth_status()
@@ -87,13 +87,13 @@ def _render_global_players_section() -> None:
     Strukturalnie: nagłówek + status pobrania + przycisk pobierania,
     a poniżej tabela z filtrami (narodowość, rola) i kolumną lolpros.
     """
-    st.header("🌍 Wszyscy gracze (globalnie)")
+    st.header("🌍 All players (global)")
     st.caption(
-        "Cała tabela `Players` z Leaguepedia — jeden wiersz na gracza, "
-        "niezależnie od ligi. Filtruj po narodowości i roli. "
-        "Kolumna lolpros pokazuje link do profilu lolpros.gg, jeśli "
-        "gracz tam jest (sprawdzenie wymaga osobnego kliknięcia — "
-        "lolpros to zewnętrzna strona, sprawdzenie idzie po HTTP)."
+        "The full `Players` table from Leaguepedia — one row per player, "
+        "independent of league. Filter by nationality and role. "
+        "The lolpros column shows a link to the lolpros.gg profile if the "
+        "player has one (requires a separate click — lolpros is an external "
+        "site, the check is done over HTTP)."
     )
 
     sync_row = get_all_players_global_sync()
@@ -101,69 +101,69 @@ def _render_global_players_section() -> None:
     unchecked = count_lolpros_unchecked()
 
     m1, m2, m3 = st.columns(3)
-    m1.metric("Graczy w bazie", total)
+    m1.metric("Players in DB", total)
     m2.metric(
-        "Ostatnie pobranie",
+        "Last fetch",
         _fmt_dt(sync_row["last_fetched"]) if sync_row else "—",
     )
-    m3.metric("Bez sprawdzonego lolpros", unchecked)
+    m3.metric("Unchecked on lolpros", unchecked)
 
     # Pobieranie — bez filtrów. Filtry na liście (poniżej) działają
     # po stronie klienta, więc raz pobrana baza obsłuży wszystkie.
     if st.button(
-        "⬇️ Pobierz / odśwież globalną bazę graczy",
+        "⬇️ Fetch / refresh global player database",
         use_container_width=True,
-        help="Pobiera całą tabelę Players z Leaguepedia. To może potrwać "
-             "minutę — Players ma ~30 tys. wierszy.",
+        help="Fetches the full Players table from Leaguepedia. May take "
+             "a minute — Players has ~30k rows.",
     ):
         _fetch_all_and_report()
 
     if total == 0:
-        st.info("Baza pusta — kliknij przycisk powyżej, by pobrać.")
+        st.info("DB is empty — click the button above to fetch.")
         return
 
     # --- Tabela + filtry ---
     all_players = fetch_all_players_global()
     df = pd.DataFrame(all_players)
     df = df.rename(columns={
-        "player_id":            "Nick",
+        "player_id":            "Name",
         "overview_page":        "Leaguepedia",
-        "role":                 "Rola",
-        "team":                 "Drużyna",
-        "country":              "Kraj",
-        "residency":            "Rezydencja",
-        "nationality_primary":  "Narodowość",
+        "role":                 "Role",
+        "team":                 "Team",
+        "country":              "Country",
+        "residency":            "Residency",
+        "nationality_primary":  "Nationality",
         "is_retired":           "Retired",
         "lolpros_url":          "Lolpros",
-        "lolpros_checked_at":   "Lolpros sprawdzono",
-        "last_fetched":         "Pobrane",
+        "lolpros_checked_at":   "Lolpros checked",
+        "last_fetched":         "Fetched",
     })
     df["Retired"] = df["Retired"].map(
-        lambda v: "tak" if str(v).strip() in ("1", "true", "True") else ""
+        lambda v: "yes" if str(v).strip() in ("1", "true", "True") else ""
     )
 
     f1, f2, f3 = st.columns(3)
     with f1:
-        countries = sorted(c for c in df["Narodowość"].unique() if c)
+        countries = sorted(c for c in df["Nationality"].unique() if c)
         nat_filter = st.multiselect(
-            "Narodowość", countries, default=[],
-            help="Filtruje po Players.NationalityPrimary (kod kraju "
-                 "w formie używanej przez Leaguepedia).",
+            "Nationality", countries, default=[],
+            help="Filters on Players.NationalityPrimary (country code as "
+                 "used by Leaguepedia).",
         )
     with f2:
-        roles_available = sorted(r for r in df["Rola"].unique() if r)
+        roles_available = sorted(r for r in df["Role"].unique() if r)
         role_filter = st.multiselect(
-            "Rola", roles_available, default=[],
-            help="Wartość z Players.Role na Leaguepedia.",
+            "Role", roles_available, default=[],
+            help="Value from Players.Role on Leaguepedia.",
         )
     with f3:
         only_with_lolpros = st.checkbox(
-            "Tylko z profilem lolpros",
-            help="Pokaż tylko graczy, dla których sprawdzono lolpros i "
-                 "znaleziono profil. Niezsprawdzeni są pomijani.",
+            "Only with lolpros profile",
+            help="Show only players checked on lolpros where a profile was "
+                 "found. Unchecked players are hidden.",
         )
         hide_retired = st.checkbox(
-            "Ukryj retired",
+            "Hide retired",
         )
 
     # Rozdzielenie filtrów: "data" (nat/rola/retired) decyduje, kogo w
@@ -174,17 +174,17 @@ def _render_global_players_section() -> None:
     # którzy mają pasującą narodowość/rolę, niezsprawdzonych.
     data_filtered = df
     if nat_filter:
-        data_filtered = data_filtered[data_filtered["Narodowość"].isin(nat_filter)]
+        data_filtered = data_filtered[data_filtered["Nationality"].isin(nat_filter)]
     if role_filter:
-        data_filtered = data_filtered[data_filtered["Rola"].isin(role_filter)]
+        data_filtered = data_filtered[data_filtered["Role"].isin(role_filter)]
     if hide_retired:
         data_filtered = data_filtered[data_filtered["Retired"] == ""]
 
     # Niezsprawdzeni w obrębie data_filtered — tylu czeka na pukanie.
     # Pusty „Lolpros sprawdzono" = NULL z DB = nigdy nie sprawdzano.
     unchecked = data_filtered[
-        data_filtered["Lolpros sprawdzono"].isna()
-        | (data_filtered["Lolpros sprawdzono"] == "")
+        data_filtered["Lolpros checked"].isna()
+        | (data_filtered["Lolpros checked"] == "")
     ]
 
     # Widok: opcjonalnie zawężony do tych z lolprosem.
@@ -193,9 +193,9 @@ def _render_global_players_section() -> None:
         visible = visible[visible["Lolpros"].astype(bool)]
 
     st.caption(
-        f"Widocznych: {len(visible)} · pasujących do filtrów: "
-        f"{len(data_filtered)} · niezsprawdzonych: {len(unchecked)} "
-        f"(baza: {len(df)})."
+        f"Visible: {len(visible)} · matching filters: "
+        f"{len(data_filtered)} · unchecked: {len(unchecked)} "
+        f"(DB: {len(df)})."
     )
 
     # Sprawdzanie idzie na wszystkich pasujących, nawet jeśli filtr
@@ -203,13 +203,13 @@ def _render_global_players_section() -> None:
     # — nie ma sensu pukać do lolprosa drugi raz.
     a1, a2 = st.columns([3, 1])
     a1.caption(
-        "Sprawdzanie lolpros pomija już sprawdzonych — re-check możliwy "
-        "po wyczyszczeniu kolumny `lolpros_checked_at` w bazie."
+        "Lolpros check skips already-checked — re-check by clearing the "
+        "`lolpros_checked_at` column in DB."
     )
     btn_label = (
-        f"🔎 Sprawdź lolpros ({len(unchecked)} niezsprawdzonych)"
+        f"🔎 Check lolpros ({len(unchecked)} unchecked)"
         if len(unchecked) > 0
-        else "🔎 Wszyscy pasujący już sprawdzeni"
+        else "🔎 All matching already checked"
     )
     if a2.button(
         btn_label,
@@ -223,13 +223,13 @@ def _render_global_players_section() -> None:
     display_df["Leaguepedia"] = display_df["Leaguepedia"].map(
         lambda link: _leaguepedia_url(link) if link else ""
     )
-    display_df["Lolpros sprawdzono"] = display_df["Lolpros sprawdzono"].map(
+    display_df["Lolpros checked"] = display_df["Lolpros checked"].map(
         lambda v: _fmt_dt(v) if v else "—"
     )
 
     display_cols = [
-        "Nick", "Rola", "Drużyna", "Kraj", "Rezydencja", "Narodowość",
-        "Retired", "Leaguepedia", "Lolpros", "Lolpros sprawdzono",
+        "Name", "Role", "Team", "Country", "Residency", "Nationality",
+        "Retired", "Leaguepedia", "Lolpros", "Lolpros checked",
     ]
     display_df = display_df[display_cols]
 
@@ -240,7 +240,7 @@ def _render_global_players_section() -> None:
         column_config={
             "Leaguepedia": st.column_config.LinkColumn(
                 "Leaguepedia",
-                display_text="otwórz",
+                display_text="open",
             ),
             "Lolpros": st.column_config.LinkColumn(
                 "Lolpros",
@@ -260,7 +260,7 @@ def _leaguepedia_url(overview_page: str) -> str:
 
 def _fetch_all_and_report() -> None:
     """Pobiera globalną bazę graczy z paskiem postępu i komunikatem."""
-    bar = st.progress(0.0, text="Łączę się z Leaguepedia…")
+    bar = st.progress(0.0, text="Connecting to Leaguepedia…")
 
     # Players ma rzędu 30k wierszy. Pasek wyrażony w postępie do
     # tej liczby — niedokładny, ale daje feedback (Cargo nie zwraca
@@ -269,22 +269,22 @@ def _fetch_all_and_report() -> None:
 
     def on_progress(total_so_far: int) -> None:
         pct = min(total_so_far / expected_total, 0.95)
-        bar.progress(pct, text=f"Pobrano {total_so_far} graczy…")
+        bar.progress(pct, text=f"Fetched {total_so_far} players…")
 
     outcome = sync_fetch_all_players(on_progress=on_progress)
-    bar.progress(1.0, text="Gotowe.")
+    bar.progress(1.0, text="Done.")
 
     if outcome.error:
         st.session_state["players_msg"] = (
             "err",
-            f"Pobieranie globalnej bazy padło: {outcome.error}. "
-            f"Już zapisane wiersze zostają w bazie.",
+            f"Global DB fetch failed: {outcome.error}. "
+            f"Already-saved rows stay in DB.",
         )
     else:
         st.session_state["players_msg"] = (
             "ok",
-            f"Pobrano {outcome.fetched} wierszy, zapisano "
-            f"{outcome.saved} graczy do bazy globalnej.",
+            f"Fetched {outcome.fetched} rows, saved "
+            f"{outcome.saved} players to global DB.",
         )
     st.rerun()
 
@@ -298,16 +298,16 @@ def _check_lolpros_and_report(filtered_df: pd.DataFrame) -> None:
     „tylko niezsprawdzonych".
     """
     players = filtered_df.rename(columns={
-        "Nick": "player_id",
+        "Name": "player_id",
         "Leaguepedia": "overview_page",
     })[["player_id", "overview_page"]].to_dict("records")
 
-    bar = st.progress(0.0, text="Sprawdzam lolpros…")
+    bar = st.progress(0.0, text="Checking lolpros…")
 
     def on_progress(done: int, total: int, pid: str) -> None:
         bar.progress(
             done / max(total, 1),
-            text=f"Lolpros: {done}/{total} (ostatni: {pid})",
+            text=f"Lolpros: {done}/{total} (last: {pid})",
         )
 
     found = batch_check_lolpros(
@@ -315,11 +315,11 @@ def _check_lolpros_and_report(filtered_df: pd.DataFrame) -> None:
         on_progress=on_progress,
         save=update_lolpros,
     )
-    bar.progress(1.0, text="Gotowe.")
+    bar.progress(1.0, text="Done.")
 
     st.session_state["lolpros_msg"] = (
         "ok",
-        f"Sprawdzono {len(players)} graczy — znaleziono lolpros dla "
+        f"Checked {len(players)} players — found lolpros for "
         f"{len(found)}.",
     )
     st.rerun()
@@ -329,11 +329,11 @@ def _check_lolpros_and_report(filtered_df: pd.DataFrame) -> None:
 
 def _render_per_league_section() -> None:
     """Sekcja „gracze per liga"  — pobieranie rosterów turniejów."""
-    st.header("🏟️ Per liga")
+    st.header("🏟️ Per league")
     st.caption(
-        "Pobranie robi pełny snapshot rosterów lig z LEAGUE_GROUPS "
-        "(skład drużyn zmienia się przy transferach, więc bez kursora). "
-        "Jeden gracz może pojawić się w kilku ligach — to osobne wpisy."
+        "Fetch grabs a full snapshot of rosters across LEAGUE_GROUPS "
+        "(rosters change at transfers, so no cursor). "
+        "One player may appear in several leagues — separate entries."
     )
 
     sync = all_players_sync()
@@ -343,13 +343,13 @@ def _render_per_league_section() -> None:
     )
 
     m1, m2, m3 = st.columns(3)
-    m1.metric("Unikalnych graczy", count_unique_players())
-    m2.metric("Wpisów w bazie", sum(
+    m1.metric("Unique players", count_unique_players())
+    m2.metric("Entries in DB", sum(
         count_players_for_league(lg) for lg in all_leagues
     ))
-    m3.metric("Ligi wczytane", f"{n_loaded} / {len(all_leagues)}")
+    m3.metric("Leagues synced", f"{n_loaded} / {len(all_leagues)}")
 
-    if st.button("⬇️ Wczytaj graczy wszystkich lig",
+    if st.button("⬇️ Fetch players of all leagues",
                  use_container_width=True):
         _fetch_per_league_and_report(all_leagues)
 
@@ -364,67 +364,67 @@ def _render_per_league_section() -> None:
     st.divider()
 
     # --- tabela graczy z lig (per-ligowych) ---
-    st.subheader("Tabela graczy z lig")
+    st.subheader("Per-league player table")
 
     per_league_players = fetch_per_league_players()
     if not per_league_players:
         st.info(
-            "Tabela per-ligowa jest pusta — pobierz dane przyciskami powyżej."
+            "Per-league table is empty — fetch data via the buttons above."
         )
         return
 
     df = pd.DataFrame(per_league_players)
     df = df.rename(columns={
-        "player_id":            "Nick",
+        "player_id":            "Name",
         "overview_page":        "Leaguepedia",
-        "role":                 "Rola",
-        "team":                 "Drużyna",
-        "league":               "Liga",
-        "country":              "Kraj",
-        "residency":            "Rezydencja",
-        "nationality_primary":  "Narodowość",
+        "role":                 "Role",
+        "team":                 "Team",
+        "league":               "League",
+        "country":              "Country",
+        "residency":            "Residency",
+        "nationality_primary":  "Nationality",
         "is_retired":           "Retired",
-        "tournament":           "Ostatni turniej",
-        "date_start":           "Data startu turnieju",
-        "last_fetched":         "Pobrane",
+        "tournament":           "Last tournament",
+        "date_start":           "Tournament start",
+        "last_fetched":         "Fetched",
     })
     display_cols = [
-        "Nick", "Rola", "Drużyna", "Liga", "Kraj", "Rezydencja",
-        "Narodowość", "Retired", "Ostatni turniej",
-        "Data startu turnieju", "Leaguepedia", "Pobrane",
+        "Name", "Role", "Team", "League", "Country", "Residency",
+        "Nationality", "Retired", "Last tournament",
+        "Tournament start", "Leaguepedia", "Fetched",
     ]
     df = df[display_cols]
 
     f1, f2, f3 = st.columns(3)
     with f1:
         league_filter = st.multiselect(
-            "Filtr lig", sorted(df["Liga"].unique()), default=[]
+            "League filter", sorted(df["League"].unique()), default=[]
         )
     with f2:
-        roles_available = sorted(r for r in df["Rola"].unique() if r)
+        roles_available = sorted(r for r in df["Role"].unique() if r)
         role_filter = st.multiselect(
-            "Filtr ról", roles_available, default=[]
+            "Role filter", roles_available, default=[]
         )
     with f3:
-        search = st.text_input("Szukaj (nick / drużyna / wiki)", value="")
+        search = st.text_input("Search (name / team / wiki)", value="")
 
     filtered = df
     if league_filter:
-        filtered = filtered[filtered["Liga"].isin(league_filter)]
+        filtered = filtered[filtered["League"].isin(league_filter)]
     if role_filter:
-        filtered = filtered[filtered["Rola"].isin(role_filter)]
+        filtered = filtered[filtered["Role"].isin(role_filter)]
     if search.strip():
         s = search.strip().lower()
         mask = (
-            filtered["Nick"].str.lower().str.contains(s, na=False)
-            | filtered["Drużyna"].str.lower().str.contains(s, na=False)
+            filtered["Name"].str.lower().str.contains(s, na=False)
+            | filtered["Team"].str.lower().str.contains(s, na=False)
             | filtered["Leaguepedia"].str.lower().str.contains(s, na=False)
         )
         filtered = filtered[mask]
 
     st.caption(
-        f"{len(filtered)} wpisów (z {len(df)} w bazie). "
-        f"Uwaga: ten sam gracz może być w wielu ligach — to osobne wpisy."
+        f"{len(filtered)} entries (of {len(df)} in DB). "
+        f"Note: the same player may appear in several leagues — separate entries."
     )
     st.dataframe(filtered, use_container_width=True, hide_index=True)
 
@@ -435,7 +435,7 @@ def _league_rows(leagues: list[str], sync: dict) -> None:
     """Renderuje nagłówek i po jednym wierszu na ligę z przyciskiem pobrania."""
     header = st.columns(_COLS, vertical_alignment="center")
     for col, title in zip(
-        header, ["Liga", "Graczy w bazie", "Ostatnie pobranie", ""]
+        header, ["League", "Players in DB", "Last fetch", ""]
     ):
         col.caption(title)
 
@@ -451,7 +451,7 @@ def _league_rows(leagues: list[str], sync: dict) -> None:
         c_local.write(str(local))
         c_last.write(_fmt_dt(last_fetched) if last_fetched else "—")
 
-        label = "↻ Odśwież" if last_fetched else "⬇️ Pobierz"
+        label = "↻ Refresh" if last_fetched else "⬇️ Fetch"
         if c_btn.button(label, key=f"players_load_{lg}",
                         use_container_width=True):
             _fetch_per_league_and_report([lg])
@@ -473,9 +473,9 @@ def _fetch_per_league_and_report(leagues: list[str]) -> None:
          odczekaj _RETRY_COOLDOWN i ponów TYLKO te ligi. Udany retry
          nadpisuje wynik z fazy 1, więc raport pokazuje stan końcowy.
     """
-    bar = st.progress(0.0, text="Łączę się z Leaguepedia…")
+    bar = st.progress(0.0, text="Connecting to Leaguepedia…")
     outcomes = _run_pass(
-        leagues, bar, label_prefix="Pobieram graczy",
+        leagues, bar, label_prefix="Fetching players",
         progress_offset=0.0, progress_scale=1.0,
     )
 
@@ -484,12 +484,12 @@ def _fetch_per_league_and_report(leagues: list[str]) -> None:
         for s in range(int(_RETRY_COOLDOWN), 0, -1):
             bar.progress(
                 1.0,
-                text=f"{len(failed)} lig padło — ponowię za {s}s…",
+                text=f"{len(failed)} leagues failed — retrying in {s}s…",
             )
             time.sleep(1.0)
 
         retry_outcomes = _run_pass(
-            failed, bar, label_prefix="Ponawiam",
+            failed, bar, label_prefix="Retrying",
             progress_offset=0.0, progress_scale=1.0,
         )
         by_league = {o.league: o for o in outcomes}
@@ -497,7 +497,7 @@ def _fetch_per_league_and_report(leagues: list[str]) -> None:
             by_league[o.league] = o
         outcomes = [by_league[lg] for lg in leagues]
 
-    bar.progress(1.0, text="Gotowe.")
+    bar.progress(1.0, text="Done.")
     st.session_state["players_msg"] = _summary(outcomes)
     st.rerun()
 
@@ -521,7 +521,7 @@ def _run_pass(
             pct = progress_offset + progress_scale * ((i + 1) / n)
             bar.progress(
                 pct,
-                text=f"Pauza przed kolejną ligą… ({i + 1}/{n} gotowe)",
+                text=f"Pause before next league… ({i + 1}/{n} done)",
             )
             time.sleep(_INTER_LEAGUE_PAUSE)
     return outcomes
@@ -533,12 +533,12 @@ def _summary(outcomes: list[PlayersFetchOutcome]) -> tuple[str, str]:
     errors = [o for o in outcomes if o.error]
 
     lines = [
-        f"Pobrano ligi: {len(outcomes)} · zapisano {saved} wpisów graczy."
+        f"Fetched {len(outcomes)} leagues · saved {saved} player entries."
     ]
     for o in errors:
         lines.append(
-            f"❌ **{o.league}** — pobieranie przerwał błąd: {o.error}. "
-            f"Ponów pobranie później."
+            f"❌ **{o.league}** — fetch failed: {o.error}. "
+            f"Retry later."
         )
     level = "err" if errors else "ok"
     return level, "\n\n".join(lines)

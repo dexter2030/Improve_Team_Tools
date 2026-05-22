@@ -1,14 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LEAGUE_GROUPS } from "@/lib/leaguepedia/leagues";
+
+const VISIBLE_PATCHES = 15;
 
 export function Filters({ patches }: { patches: string[] }) {
   const router = useRouter();
   const sp = useSearchParams();
   const activeLeagues = (sp.get("league") ?? "").split(",").filter(Boolean);
   const activePatches = (sp.get("patch") ?? "").split(",").filter(Boolean);
+  // Auto-expand gdy któryś aktywny patch jest poza pierwszymi 15 —
+  // inaczej user by go nie widział mimo, że jest w filtrze.
+  const hasHiddenActive = activePatches.some(
+    (p) => patches.indexOf(p) >= VISIBLE_PATCHES
+  );
+  const [showAllPatches, setShowAllPatches] = useState(hasHiddenActive);
 
   function update(key: string, values: string[]) {
     const next = new URLSearchParams(sp.toString());
@@ -95,20 +104,32 @@ export function Filters({ patches }: { patches: string[] }) {
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {patches.map((p) => (
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {(showAllPatches ? patches : patches.slice(0, VISIBLE_PATCHES)).map(
+              (p) => (
+                <button
+                  key={p}
+                  onClick={() => toggle("patch", p)}
+                  className={`text-xs px-2 py-1 rounded border transition-colors ${
+                    activePatches.includes(p)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+            {patches.length > VISIBLE_PATCHES && (
               <button
-                key={p}
-                onClick={() => toggle("patch", p)}
-                className={`text-xs px-2 py-1 rounded border transition-colors ${
-                  activePatches.includes(p)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border hover:bg-muted"
-                }`}
+                onClick={() => setShowAllPatches((v) => !v)}
+                className="text-xs px-2 py-1 rounded border border-dashed text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
-                {p}
+                {showAllPatches
+                  ? "Show less"
+                  : `Show ${patches.length - VISIBLE_PATCHES} more…`}
               </button>
-            ))}
+            )}
           </div>
         </div>
       )}

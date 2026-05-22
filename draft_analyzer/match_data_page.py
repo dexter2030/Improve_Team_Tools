@@ -32,15 +32,15 @@ def render():
 
     st.title("🗂️ Match Data")
     st.caption(
-        "Wszystkie wczytane drafty z bazy — pełna sekwencja pick&ban. "
-        "Pobieranie nowych meczów: zakładka **Database**."
+        "All synced drafts in DB — full pick & ban sequence. "
+        "Fetch new matches in the **Database** tab."
     )
 
     total = count_all_drafts()
     if total == 0:
         st.info(
-            'Baza draftów jest pusta. Wczytaj ligi w zakładce **Database** '
-            'albo w sekcji „Dane" zakładki **Draft Analyzer**.'
+            'Draft DB is empty. Sync leagues in the **Database** tab '
+            'or in the "Data" section of **Draft Analyzer**.'
         )
         return
 
@@ -48,22 +48,22 @@ def render():
     f1, f2 = st.columns(2)
     with f1:
         patches = st.multiselect(
-            "Filtr patchy (puste = wszystkie)",
+            "Patch filter (empty = all)",
             options=list_patches(),
             key="md_patches",
         )
     with f2:
         teams = st.multiselect(
-            "Filtr drużyn (puste = wszystkie)",
+            "Team filter (empty = all)",
             options=list_teams(),
             key="md_teams",
-            help="Dopasowanie po stronie blue LUB red.",
+            help="Match on blue OR red side.",
         )
 
-    st.markdown("**Zakres lig**")
+    st.markdown("**League scope**")
     st.caption(
-        "Presety to szybki start — po kliknięciu listę nadal można edytować. "
-        "Puste = wszystkie ligi w bazie."
+        "Presets are a quick start — you can still edit the list after clicking. "
+        "Empty = all leagues in DB."
     )
     preset_cols = st.columns(len(PRESETS))
     for col, (name, leagues_preset) in zip(preset_cols, PRESETS.items()):
@@ -72,8 +72,8 @@ def render():
             st.session_state["md_leagues"] = list(leagues_preset)
             st.rerun()
     st.multiselect(
-        "Ligi", options=all_known_leagues(), key="md_leagues",
-        help="Dodaj lub usuń dowolne ligi.",
+        "Leagues", options=all_known_leagues(), key="md_leagues",
+        help="Add or remove any leagues.",
     )
 
     # --- pobranie + filtrowanie ---
@@ -88,11 +88,11 @@ def render():
         ]
 
     st.caption(
-        f"{len(drafts)} draftów po filtrach (z {total} w bazie). "
-        f"Kolumny w kolejności draftu (T1 = blue side, T2 = red side)."
+        f"{len(drafts)} drafts after filters (of {total} in DB). "
+        f"Columns in draft order (T1 = blue side, T2 = red side)."
     )
     if not drafts:
-        st.warning("Brak draftów pasujących do filtrów.")
+        st.warning("No drafts match the filters.")
         return
 
     st.dataframe(
@@ -115,9 +115,9 @@ def _draft_row(d: dict) -> dict:
         return d.get(key) or ""
 
     return {
-        "Liga":    d.get("league") or "",
+        "League":  d.get("league") or "",
         "Patch":   d.get("patch") or "",
-        "Data":    d.get("game_date") or "",
+        "Date":    d.get("game_date") or "",
         "Blue":    d.get("blue_team") or "",
         "Red":     d.get("red_team") or "",
         "Winner":  d.get("winner") or "",

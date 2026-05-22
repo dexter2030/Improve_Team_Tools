@@ -313,61 +313,61 @@ def render_sidebar(store: ProfileStore) -> str:
 # --- Page: Add Player --------------------------------------------------------
 
 def page_add_player(store: ProfileStore) -> None:
-    st.header("Dodaj gracza do obserwacji")
+    st.header("Add player to watchlist")
     st.caption(
-        "Wklej linki do profili zawodnika — zostaną zweryfikowane na żywo "
-        "(op.gg → Riot API, Leaguepedia → wiki). Wiek, kraj i notatka to "
-        "Twoje metadane scoutingowe. lolpros jest zapisywany jako odnośnik."
+        "Paste profile links — they will be verified live "
+        "(op.gg → Riot API, Leaguepedia → wiki). Age, country and notes are "
+        "your scouting metadata. lolpros is stored as a reference link."
     )
 
     with st.form("add_player", clear_on_submit=False):
         col1, col2 = st.columns(2)
         with col1:
             display_name = st.text_input(
-                "Nazwa gracza *", placeholder="Jak go nazywasz"
+                "Player name *", placeholder="Display name"
             )
-            role = st.selectbox("Rola *", [r.value for r in Role])
-            age = st.number_input("Wiek", min_value=12, max_value=60,
+            role = st.selectbox("Role *", [r.value for r in Role])
+            age = st.number_input("Age", min_value=12, max_value=60,
                                   value=18, step=1)
         with col2:
-            nationality = st.text_input("Kraj", placeholder="np. Polska")
+            nationality = st.text_input("Country", placeholder="e.g., Poland")
             leaguepedia_url = st.text_input(
-                "Link Leaguepedia",
+                "Leaguepedia link",
                 placeholder="https://lol.fandom.com/wiki/...",
             )
             lolpros_url = st.text_input(
-                "Link lolpros",
+                "lolpros link",
                 placeholder="https://lolpros.gg/player/...",
             )
 
         opgg_raw = st.text_area(
-            "Linki op.gg — jeden na linię", height=120,
-            placeholder=("https://op.gg/lol/summoners/euw/Nazwa-TAG\n"
-                         "https://op.gg/lol/summoners/kr/Inne-TAG"),
+            "op.gg links — one per line", height=120,
+            placeholder=("https://op.gg/lol/summoners/euw/Name-TAG\n"
+                         "https://op.gg/lol/summoners/kr/Other-TAG"),
         )
         st.caption(
-            "Każdy link op.gg to osobne konto SoloQ — dodaj ich dowolnie wiele."
+            "Each op.gg link is a separate SoloQ account — add as many as you like."
         )
 
-        notes = st.text_area("Notatka", height=120,
-                             placeholder="Twoja ocena gracza...")
+        notes = st.text_area("Notes", height=120,
+                             placeholder="Your scouting notes...")
 
-        submitted = st.form_submit_button("Dodaj i zweryfikuj", type="primary")
+        submitted = st.form_submit_button("Add and verify", type="primary")
 
     if not submitted:
         return
 
     # --- Validation ---
     if not display_name.strip():
-        st.error("Nazwa gracza jest wymagana.")
+        st.error("Player name is required.")
         return
 
     opgg_lines = [ln.strip() for ln in opgg_raw.splitlines() if ln.strip()]
     lp_url = leaguepedia_url.strip()
     if not opgg_lines and not lp_url:
         st.error(
-            "Podaj przynajmniej jeden link op.gg lub link Leaguepedia — "
-            "inaczej nie ma czego pobrać."
+            "Provide at least one op.gg or Leaguepedia link — "
+            "otherwise there's nothing to fetch."
         )
         return
 
@@ -411,16 +411,16 @@ def page_add_player(store: ProfileStore) -> None:
             notes=notes,
         )
     except ValueError as err:
-        st.error(f"Nie udało się utworzyć profilu: {err}")
+        st.error(f"Could not create profile: {err}")
         return
 
     # --- Resolve identity keys ---
-    with st.spinner("Weryfikuję tożsamość w źródłach danych..."):
+    with st.spinner("Verifying identity against data sources..."):
         result = get_resolver().resolve(profile)
 
     store.upsert(result.profile)
     st.markdown(
-        f"Dodano **{result.profile.display_name}** &nbsp;"
+        f"Added **{result.profile.display_name}** &nbsp;"
         f"{_status_badge(result.profile.resolution_state)}",
         unsafe_allow_html=True,
     )
