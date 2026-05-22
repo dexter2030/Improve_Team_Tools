@@ -19,12 +19,26 @@ import type { SourceReport } from "@/lib/profiles";
 
 const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"] as const;
 
-export function AddPlayerForm() {
+interface AddPlayerFormProps {
+  initialDisplayName?: string;
+  initialRole?: (typeof ROLES)[number];
+  initialNationality?: string;
+  initialLeaguepediaUrl?: string;
+  initialLolprosUrl?: string;
+}
+
+export function AddPlayerForm({
+  initialDisplayName,
+  initialRole,
+  initialNationality,
+  initialLeaguepediaUrl,
+  initialLolprosUrl,
+}: AddPlayerFormProps = {}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [reports, setReports] = useState<SourceReport[] | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
-  const [role, setRole] = useState<string>("Mid");
+  const [role, setRole] = useState<string>(initialRole ?? "Mid");
 
   function onSubmit(formData: FormData) {
     setReports(null);
@@ -60,6 +74,7 @@ export function AddPlayerForm() {
           <Input
             id="displayName"
             name="displayName"
+            defaultValue={initialDisplayName ?? ""}
             required
           />
         </div>
@@ -94,7 +109,12 @@ export function AddPlayerForm() {
 
         <div className="space-y-2">
           <Label htmlFor="nationality">Country</Label>
-          <Input id="nationality" name="nationality" placeholder="e.g., Poland" />
+          <Input
+            id="nationality"
+            name="nationality"
+            placeholder="e.g., Poland"
+            defaultValue={initialNationality ?? ""}
+          />
         </div>
 
         <div className="space-y-2 md:col-span-2">
@@ -103,6 +123,7 @@ export function AddPlayerForm() {
             id="leaguepediaUrl"
             name="leaguepediaUrl"
             placeholder="https://lol.fandom.com/wiki/..."
+            defaultValue={initialLeaguepediaUrl ?? ""}
           />
         </div>
 
@@ -112,6 +133,7 @@ export function AddPlayerForm() {
             id="lolprosUrl"
             name="lolprosUrl"
             placeholder="https://lolpros.gg/player/..."
+            defaultValue={initialLolprosUrl ?? ""}
           />
         </div>
       </div>

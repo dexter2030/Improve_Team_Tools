@@ -136,6 +136,7 @@ export async function upsertPlayers(players: NewLpPlayer[]): Promise<number> {
           country: sql`excluded.country`,
           residency: sql`excluded.residency`,
           nationalityPrimary: sql`excluded.nationality_primary`,
+          lolpros: sql`excluded.lolpros`,
           isRetired: sql`excluded.is_retired`,
           syncedAt: sql`excluded.synced_at`,
         },

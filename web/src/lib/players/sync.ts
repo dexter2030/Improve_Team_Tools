@@ -21,6 +21,7 @@ export async function syncAllPlayers(): Promise<PlayersFetchOutcome> {
         country: r.country,
         residency: r.residency,
         nationalityPrimary: r.nationalityPrimary,
+        lolpros: r.lolpros,
         isRetired: r.isRetired,
         syncedAt: new Date(),
       }))

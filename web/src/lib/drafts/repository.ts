@@ -50,59 +50,73 @@ export async function distinctPatches(): Promise<string[]> {
   return sortPatchesDesc(list);
 }
 
-/** Bulk upsert draftów. Idempotentne — ten sam matchId nadpisuje stary wiersz. */
+/**
+ * Bulk upsert draftów w chunkach po CHUNK_SIZE. Idempotentne — ten sam
+ * matchId nadpisuje stary wiersz.
+ *
+ * Chunking konieczny dla dużych lig (LPL/LCK mają 5k-10k+ historycznych
+ * gier). Jeden gigantyczny INSERT z 10k×17 placeholderów (postgres-js
+ * z prepare:false) wybijał "Maximum call stack size exceeded" przy
+ * serializacji parametrów.
+ */
+const CHUNK_SIZE = 500;
+
 export async function upsertDrafts(rows: RawDraft[]): Promise<number> {
   if (rows.length === 0) return 0;
-  // Postgres upsert w transakcji batchowej — Drizzle przyjmuje array values.
-  await db
-    .insert(drafts)
-    .values(
-      rows.map((r) => ({
-        matchId: r.matchId,
-        patch: r.patch,
-        league: r.league,
-        gameDate: r.gameDate,
-        blueTeam: r.blueTeam,
-        redTeam: r.redTeam,
-        blueBans: r.blueBans,
-        redBans: r.redBans,
-        b1Pick: r.b1Pick,
-        r1Pick: r.r1Pick,
-        r2Pick: r.r2Pick,
-        b2Pick: r.b2Pick,
-        b3Pick: r.b3Pick,
-        r3Pick: r.r3Pick,
-        b4Pick: r.b4Pick,
-        b5Pick: r.b5Pick,
-        r4Pick: r.r4Pick,
-        r5Pick: r.r5Pick,
-        winner: r.winner,
-      }))
-    )
-    .onConflictDoUpdate({
-      target: drafts.matchId,
-      set: {
-        patch: sql`excluded.patch`,
-        league: sql`excluded.league`,
-        gameDate: sql`excluded.game_date`,
-        blueTeam: sql`excluded.blue_team`,
-        redTeam: sql`excluded.red_team`,
-        blueBans: sql`excluded.blue_bans`,
-        redBans: sql`excluded.red_bans`,
-        b1Pick: sql`excluded.b1_pick`,
-        r1Pick: sql`excluded.r1_pick`,
-        r2Pick: sql`excluded.r2_pick`,
-        b2Pick: sql`excluded.b2_pick`,
-        b3Pick: sql`excluded.b3_pick`,
-        r3Pick: sql`excluded.r3_pick`,
-        b4Pick: sql`excluded.b4_pick`,
-        b5Pick: sql`excluded.b5_pick`,
-        r4Pick: sql`excluded.r4_pick`,
-        r5Pick: sql`excluded.r5_pick`,
-        winner: sql`excluded.winner`,
-      },
-    });
-  return rows.length;
+  let total = 0;
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    await db
+      .insert(drafts)
+      .values(
+        chunk.map((r) => ({
+          matchId: r.matchId,
+          patch: r.patch,
+          league: r.league,
+          gameDate: r.gameDate,
+          blueTeam: r.blueTeam,
+          redTeam: r.redTeam,
+          blueBans: r.blueBans,
+          redBans: r.redBans,
+          b1Pick: r.b1Pick,
+          r1Pick: r.r1Pick,
+          r2Pick: r.r2Pick,
+          b2Pick: r.b2Pick,
+          b3Pick: r.b3Pick,
+          r3Pick: r.r3Pick,
+          b4Pick: r.b4Pick,
+          b5Pick: r.b5Pick,
+          r4Pick: r.r4Pick,
+          r5Pick: r.r5Pick,
+          winner: r.winner,
+        }))
+      )
+      .onConflictDoUpdate({
+        target: drafts.matchId,
+        set: {
+          patch: sql`excluded.patch`,
+          league: sql`excluded.league`,
+          gameDate: sql`excluded.game_date`,
+          blueTeam: sql`excluded.blue_team`,
+          redTeam: sql`excluded.red_team`,
+          blueBans: sql`excluded.blue_bans`,
+          redBans: sql`excluded.red_bans`,
+          b1Pick: sql`excluded.b1_pick`,
+          r1Pick: sql`excluded.r1_pick`,
+          r2Pick: sql`excluded.r2_pick`,
+          b2Pick: sql`excluded.b2_pick`,
+          b3Pick: sql`excluded.b3_pick`,
+          r3Pick: sql`excluded.r3_pick`,
+          b4Pick: sql`excluded.b4_pick`,
+          b5Pick: sql`excluded.b5_pick`,
+          r4Pick: sql`excluded.r4_pick`,
+          r5Pick: sql`excluded.r5_pick`,
+          winner: sql`excluded.winner`,
+        },
+      });
+    total += chunk.length;
+  }
+  return total;
 }
 
 // --- League sync state -----------------------------------------------------

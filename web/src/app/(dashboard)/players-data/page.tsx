@@ -145,39 +145,82 @@ export default async function PlayersDataPage({ searchParams }: Props) {
                     <SortHeader column="isRetired" label="Status" />
                   </TableHead>
                   <TableHead>Leaguepedia</TableHead>
+                  <TableHead>lolpros</TableHead>
+                  <TableHead className="text-right">Scouting</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {players.map((p) => (
-                  <TableRow key={p.overviewPage}>
-                    <TableCell className="font-medium">
-                      {p.id ?? "—"}
-                    </TableCell>
-                    <TableCell>{p.role ?? "—"}</TableCell>
-                    <TableCell>{p.team ?? "—"}</TableCell>
-                    <TableCell>{p.country ?? "—"}</TableCell>
-                    <TableCell>{p.residency ?? "—"}</TableCell>
-                    <TableCell>
-                      {p.isRetired ? (
-                        <Badge variant="secondary">retired</Badge>
-                      ) : (
-                        <Badge>active</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <a
-                        href={`https://lol.fandom.com/wiki/${encodeURIComponent(
-                          p.overviewPage.replace(/ /g, "_")
-                        )}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline text-xs"
-                      >
-                        {p.overviewPage} ↗
-                      </a>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {players.map((p) => {
+                  const leaguepediaUrl = `https://lol.fandom.com/wiki/${encodeURIComponent(
+                    p.overviewPage.replace(/ /g, "_")
+                  )}`;
+                  const lolprosUrl = p.lolpros
+                    ? `https://lolpros.gg/player/${p.lolpros}`
+                    : null;
+                  const scoutingRoles = ["Top", "Jungle", "Mid", "Bot", "Support"];
+                  const canScout = !!p.role && scoutingRoles.includes(p.role);
+                  const addParams = new URLSearchParams();
+                  if (p.id) addParams.set("displayName", p.id);
+                  if (canScout && p.role) addParams.set("role", p.role);
+                  if (p.country) addParams.set("nationality", p.country);
+                  addParams.set("leaguepediaUrl", leaguepediaUrl);
+                  if (lolprosUrl) addParams.set("lolprosUrl", lolprosUrl);
+                  return (
+                    <TableRow key={p.overviewPage}>
+                      <TableCell className="font-medium">
+                        {p.id ?? "—"}
+                      </TableCell>
+                      <TableCell>{p.role ?? "—"}</TableCell>
+                      <TableCell>{p.team ?? "—"}</TableCell>
+                      <TableCell>{p.country ?? "—"}</TableCell>
+                      <TableCell>{p.residency ?? "—"}</TableCell>
+                      <TableCell>
+                        {p.isRetired ? (
+                          <Badge variant="secondary">retired</Badge>
+                        ) : (
+                          <Badge>active</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <a
+                          href={leaguepediaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary hover:underline text-xs"
+                        >
+                          {p.overviewPage} ↗
+                        </a>
+                      </TableCell>
+                      <TableCell>
+                        {lolprosUrl ? (
+                          <a
+                            href={lolprosUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline text-xs"
+                          >
+                            {p.lolpros} ↗
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link
+                          href={`/scouting/add?${addParams.toString()}`}
+                          className={buttonVariants({ variant: "outline", size: "xs" })}
+                          title={
+                            canScout
+                              ? "Add to scouting list (prefilled)"
+                              : "Role not supported — pick it in the form"
+                          }
+                        >
+                          + Scouting
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
             <Pagination

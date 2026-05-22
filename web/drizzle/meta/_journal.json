@@ -29,6 +29,13 @@
       "when": 1779395939875,
       "tag": "0003_lp_tournament_players",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779470944762,
+      "tag": "0004_hard_chronomancer",
+      "breakpoints": true
     }
   ]
 }
