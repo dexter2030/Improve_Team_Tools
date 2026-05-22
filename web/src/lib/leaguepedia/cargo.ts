@@ -218,7 +218,7 @@ export async function cargoQuery(
       }
       if (!res.ok) {
         throw new CargoError(
-          `Leaguepedia Cargo zwróciło HTTP ${res.status}`,
+          `Leaguepedia Cargo returned HTTP ${res.status}`,
           res.status
         );
       }

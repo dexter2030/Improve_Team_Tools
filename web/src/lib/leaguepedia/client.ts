@@ -59,14 +59,14 @@ export class LeaguepediaClient {
       return {
         level: "ok",
         message:
-          "Leaguepedia: zalogowano bot-passwordem — podwyższony limit API.",
+          "Leaguepedia: signed in with bot-password — higher API limit.",
       };
     }
     if (state === "error") {
       return {
         level: "warn",
         message:
-          "Leaguepedia: logowanie bot-passwordem nie powiodło się — sprawdź LEAGUEPEDIA_USERNAME / LEAGUEPEDIA_PASSWORD.",
+          "Leaguepedia: bot-password sign-in failed — check LEAGUEPEDIA_USERNAME / LEAGUEPEDIA_PASSWORD.",
       };
     }
     const hasCreds = !!(
@@ -76,13 +76,13 @@ export class LeaguepediaClient {
       return {
         level: "info",
         message:
-          "Leaguepedia: bot-password skonfigurowany — logowanie nastąpi przy pierwszym fetchu.",
+          "Leaguepedia: bot-password configured — sign-in on first fetch.",
       };
     }
     return {
       level: "warn",
       message:
-        "Leaguepedia: tryb anonimowy — niski limit API. Dodaj LEAGUEPEDIA_USERNAME / LEAGUEPEDIA_PASSWORD do env.",
+        "Leaguepedia: anonymous mode — low API limit. Add LEAGUEPEDIA_USERNAME / LEAGUEPEDIA_PASSWORD to env.",
     };
   }
 
