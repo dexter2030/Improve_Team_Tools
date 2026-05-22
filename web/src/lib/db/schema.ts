@@ -190,6 +190,7 @@ export const lpPlayersAll = pgTable(
     country: text("country"),
     residency: text("residency"),
     nationalityPrimary: text("nationality_primary"),
+    lolpros: text("lolpros"),
     isRetired: boolean("is_retired").notNull().default(false),
     syncedAt: timestamp("synced_at", { withTimezone: true })
       .notNull()

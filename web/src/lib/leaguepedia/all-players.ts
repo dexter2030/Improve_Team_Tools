@@ -13,6 +13,7 @@ export interface RawLpPlayer {
   country: string | null;
   residency: string | null;
   nationalityPrimary: string | null;
+  lolpros: string | null;
   isRetired: boolean;
 }
 
@@ -23,7 +24,8 @@ export async function fetchAllPlayers(maxRows = 50000): Promise<RawLpPlayer[]> {
       fields:
         "Players.OverviewPage=OverviewPage,Players.ID=ID,Players.Team=Team," +
         "Players.Role=Role,Players.Country=Country,Players.Residency=Residency," +
-        "Players.NationalityPrimary=NationalityPrimary,Players.IsRetired=IsRetired",
+        "Players.NationalityPrimary=NationalityPrimary,Players.Lolpros=Lolpros," +
+        "Players.IsRetired=IsRetired",
       orderBy: "Players.OverviewPage ASC",
     },
     maxRows
@@ -40,6 +42,7 @@ function normalize(row: CargoRow): RawLpPlayer {
     country: toStr(row.Country) || null,
     residency: toStr(row.Residency) || null,
     nationalityPrimary: toStr(row.NationalityPrimary) || null,
+    lolpros: toStr(row.Lolpros) || null,
     isRetired: toBool(row.IsRetired),
   };
 }

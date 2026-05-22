@@ -1,0 +1,1 @@
+ALTER TABLE "lp_players_all" ADD COLUMN "lolpros" text;
