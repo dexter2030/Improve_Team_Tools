@@ -20,7 +20,7 @@ export class RiotApiError extends Error {
 export class UnauthorizedError extends RiotApiError {
   constructor(body?: unknown) {
     super(
-      "Riot API key jest nieprawidłowy lub wygasł (401/403). Odśwież RIOT_API_KEY.",
+      "Riot API key is invalid or expired (401/403). Refresh RIOT_API_KEY.",
       401,
       body
     );
@@ -41,7 +41,7 @@ export class RateLimitError extends RiotApiError {
     body?: unknown
   ) {
     super(
-      `Rate limit przekroczony, ponów za ${retryAfterSeconds}s.`,
+      `Rate limit exceeded, retry in ${retryAfterSeconds}s.`,
       429,
       body
     );

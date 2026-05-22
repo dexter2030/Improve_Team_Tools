@@ -57,18 +57,18 @@ export async function addProfileAction(
 
   // Validate role
   if (!ROLES.includes(roleRaw as Role)) {
-    errors.push(`Nieznana rola: '${roleRaw}'.`);
+    errors.push(`Unknown role: '${roleRaw}'.`);
   }
-  if (!displayName) errors.push("Nazwa gracza jest wymagana.");
+  if (!displayName) errors.push("Player name is required.");
   if (opggRaw.length === 0 && !leaguepediaUrlRaw) {
     errors.push(
-      "Podaj przynajmniej jeden link op.gg lub link Leaguepedia."
+      "Provide at least one op.gg or Leaguepedia link."
     );
   }
 
   const age = ageRaw ? Number(ageRaw) : null;
   if (ageRaw && !Number.isFinite(age)) {
-    errors.push(`Wiek '${ageRaw}' nie jest liczbą.`);
+    errors.push(`Age '${ageRaw}' is not a number.`);
   }
 
   // Parse op.gg URLs
@@ -167,7 +167,7 @@ export async function updateNotesAction(
 export async function reResolveAction(id: string): Promise<AddProfileResult> {
   const { getProfile } = await import("@/lib/profiles/repository");
   const profile = await getProfile(id);
-  if (!profile) return { ok: false, errors: ["Profil nie istnieje."] };
+  if (!profile) return { ok: false, errors: ["Profile does not exist."] };
 
   // Wyzeruj `is_resolved` flagi żeby resolver faktycznie pobierał na nowo
   // (a nie zwracał "Already resolved" z cache w samym profilu).
@@ -244,7 +244,7 @@ export async function bulkImportAction(
           row: 0,
           displayName: "",
           ok: false,
-          errors: ["Brak danych — wpisz przynajmniej header i 1 wiersz."],
+          errors: ["No data — at least a header and 1 row required."],
         },
       ],
     };
@@ -275,7 +275,7 @@ export async function bulkImportAction(
           displayName: "",
           ok: false,
           errors: [
-            "Header musi zawierać przynajmniej kolumny: displayName, role.",
+            "Header must include at least: displayName, role.",
           ],
         },
       ],
@@ -307,13 +307,13 @@ export async function bulkImportAction(
     };
     const errors: string[] = [];
 
-    if (!displayName) errors.push("Brak nazwy.");
+    if (!displayName) errors.push("Missing name.");
     if (!ROLES.includes(roleRaw as Role)) {
-      errors.push(`Nieznana rola '${roleRaw}'.`);
+      errors.push(`Unknown role '${roleRaw}'.`);
     }
     const age = ageRaw ? Number(ageRaw) : null;
     if (ageRaw && !Number.isFinite(age)) {
-      errors.push(`Wiek '${ageRaw}' nie jest liczbą.`);
+      errors.push(`Age '${ageRaw}' is not a number.`);
     }
 
     const opggUrls = opggRaw
@@ -321,7 +321,7 @@ export async function bulkImportAction(
       .map((u) => u.trim())
       .filter(Boolean);
     if (opggUrls.length === 0 && !leaguepediaUrlRaw) {
-      errors.push("Brak op.gg ani Leaguepedia URL.");
+      errors.push("Missing op.gg or Leaguepedia URL.");
     }
 
     const soloq: SoloQIdentity[] = [];
@@ -400,7 +400,7 @@ export async function editProfileAction(
 ): Promise<AddProfileResult> {
   const { getProfile } = await import("@/lib/profiles/repository");
   const existing = await getProfile(id);
-  if (!existing) return { ok: false, errors: ["Profil nie istnieje."] };
+  if (!existing) return { ok: false, errors: ["Profile does not exist."] };
 
   const errors: string[] = [];
 
@@ -417,15 +417,15 @@ export async function editProfileAction(
     .filter(Boolean);
 
   if (!ROLES.includes(roleRaw as Role)) {
-    errors.push(`Nieznana rola: '${roleRaw}'.`);
+    errors.push(`Unknown role: '${roleRaw}'.`);
   }
-  if (!displayName) errors.push("Nazwa gracza jest wymagana.");
+  if (!displayName) errors.push("Player name is required.");
   if (opggRaw.length === 0 && !leaguepediaUrlRaw) {
-    errors.push("Podaj przynajmniej jeden link op.gg lub Leaguepedia.");
+    errors.push("Provide at least one op.gg or Leaguepedia link.");
   }
   const age = ageRaw ? Number(ageRaw) : null;
   if (ageRaw && !Number.isFinite(age)) {
-    errors.push(`Wiek '${ageRaw}' nie jest liczbą.`);
+    errors.push(`Age '${ageRaw}' is not a number.`);
   }
 
   // Parse nowe op.gg URLs — preservujemy puuid/level dla niezmienionych

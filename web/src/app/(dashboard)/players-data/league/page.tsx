@@ -37,12 +37,11 @@ export default async function LeaguePlayersIndex() {
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            Players Data — per liga
+            Players Data — per league
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Rostery z TournamentPlayers (Leaguepedia). Każda liga
-            synchronizowana niezależnie — wybierz tylko te których
-            scouting interesuje.
+            Rosters from Leaguepedia TournamentPlayers. Each league synced
+            independently — pick only the ones you scout.
           </p>
         </div>
         <Link
@@ -50,7 +49,7 @@ export default async function LeaguePlayersIndex() {
           className={buttonVariants({ variant: "outline" })}
         >
           <Globe className="h-4 w-4 mr-2" />
-          Wróć do globalnej
+          Back to global
         </Link>
       </div>
 
@@ -92,17 +91,17 @@ function Section({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Kliknij ligę żeby zobaczyć rosterów. Sync przed pierwszym wejściem.
+          Click a league to see rosters. Sync before first entry.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Liga</TableHead>
-              <TableHead className="text-right">Graczy w bazie</TableHead>
-              <TableHead>Ostatnie pobranie</TableHead>
-              <TableHead className="text-right">Akcja</TableHead>
+              <TableHead>League</TableHead>
+              <TableHead className="text-right">Players in DB</TableHead>
+              <TableHead>Last fetch</TableHead>
+              <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -125,7 +124,7 @@ function Section({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{n}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {last ? new Date(last).toLocaleString("pl-PL") : "—"}
+                    {last ? new Date(last).toLocaleString("en-US") : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <LeagueSyncButton league={lg} hasData={n > 0} />

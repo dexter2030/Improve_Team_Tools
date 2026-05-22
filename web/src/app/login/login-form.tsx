@@ -23,7 +23,7 @@ export function LoginForm({ from, error }: { from: string; error?: string }) {
         router.push(from || "/scouting");
         router.refresh();
       } else {
-        setLocalError("Złe hasło.");
+        setLocalError("Wrong password");
       }
     });
   }
@@ -34,14 +34,14 @@ export function LoginForm({ from, error }: { from: string; error?: string }) {
         name="password"
         type="password"
         autoFocus
-        placeholder="Hasło"
+        placeholder="Password"
         required
       />
       {localError && (
         <p className="text-sm text-destructive">{localError}</p>
       )}
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Loguję..." : "Zaloguj"}
+        {pending ? "Signing in..." : "Sign in"}
       </Button>
     </form>
   );

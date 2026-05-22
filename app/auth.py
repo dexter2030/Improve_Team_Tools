@@ -43,17 +43,17 @@ def require_password() -> None:
 
     st.set_page_config(page_title="LoL Scouting Dashboard", layout="centered")
     st.title("🔒 LoL Scouting Dashboard")
-    st.caption("Strona prywatna — podaj hasło żeby kontynuować.")
+    st.caption("Private — enter password to continue.")
 
     with st.form("login_form", clear_on_submit=False):
-        password = st.text_input("Hasło", type="password")
-        submitted = st.form_submit_button("Zaloguj", type="primary")
+        password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Sign in", type="primary")
 
     if submitted:
         if hmac.compare_digest(password, expected):
             st.session_state["auth_ok"] = True
             st.rerun()
         else:
-            st.error("Złe hasło.")
+            st.error("Wrong password")
 
     st.stop()

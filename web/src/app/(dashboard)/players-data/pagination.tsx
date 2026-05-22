@@ -32,8 +32,8 @@ export function Pagination({
     <div className="flex items-center justify-between gap-4 px-4 py-3 border-t">
       <div className="text-xs text-muted-foreground">
         {total === 0
-          ? "Brak wyników"
-          : `${from.toLocaleString("pl-PL")}-${to.toLocaleString("pl-PL")} z ${total.toLocaleString("pl-PL")}`}
+          ? "No results"
+          : `${from.toLocaleString("en-US")}-${to.toLocaleString("en-US")} of ${total.toLocaleString("en-US")}`}
       </div>
       <div className="flex items-center gap-2">
         <Button
@@ -43,7 +43,7 @@ export function Pagination({
           disabled={page <= 1}
         >
           <ChevronLeft className="h-3.5 w-3.5 mr-1" />
-          Poprzednia
+          Previous
         </Button>
         <span className="text-xs text-muted-foreground tabular-nums">
           {page} / {totalPages}
@@ -54,7 +54,7 @@ export function Pagination({
           onClick={() => goTo(page + 1)}
           disabled={page >= totalPages}
         >
-          Następna
+          Next
           <ChevronRight className="h-3.5 w-3.5 ml-1" />
         </Button>
       </div>

@@ -22,7 +22,7 @@ export function SyncButton({
         toast.error(`${league}: ${result.error}`);
       } else {
         toast.success(
-          `${league}: pobrano ${result.fetched}, zapisano ${result.saved} draftów.`
+          `${league}: fetched ${result.fetched}, saved ${result.saved} drafts`
         );
       }
     });
@@ -31,16 +31,16 @@ export function SyncButton({
   return (
     <Button onClick={sync} disabled={pending} size="sm" variant={hasData ? "outline" : "default"}>
       {pending ? (
-        "Pobieram..."
+        "Fetching..."
       ) : hasData ? (
         <>
           <RefreshCw className="h-3.5 w-3.5 mr-1" />
-          Odśwież
+          Refresh
         </>
       ) : (
         <>
           <Download className="h-3.5 w-3.5 mr-1" />
-          Wczytaj
+          Fetch
         </>
       )}
     </Button>

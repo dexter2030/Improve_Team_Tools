@@ -14,7 +14,7 @@ export function NotesEditor({ id, initial }: { id: string; initial: string }) {
   function save() {
     startTransition(async () => {
       await updateNotesAction(id, value);
-      toast.success("Notatka zapisana.");
+      toast.success("Note saved");
     });
   }
 
@@ -24,10 +24,10 @@ export function NotesEditor({ id, initial }: { id: string; initial: string }) {
         rows={6}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Twoja ocena gracza..."
+        placeholder="Your scouting notes..."
       />
       <Button onClick={save} disabled={!dirty || pending}>
-        {pending ? "Zapisuję..." : "Zapisz notatkę"}
+        {pending ? "Saving..." : "Save note"}
       </Button>
     </div>
   );

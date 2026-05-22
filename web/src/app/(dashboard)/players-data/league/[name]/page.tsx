@@ -60,17 +60,17 @@ export default async function LeagueDetail({ params, searchParams }: Props) {
           href="/players-data/league"
           className={`${buttonVariants({ variant: "ghost", size: "sm" })} mb-2 -ml-2`}
         >
-          <ArrowLeft className="h-4 w-4 mr-1" /> Wszystkie ligi
+          <ArrowLeft className="h-4 w-4 mr-1" /> All leagues
         </Link>
         <h2 className="text-2xl font-semibold tracking-tight">{league}</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          {players.length} graczy w bazie · {byTeam.size} drużyn.
+          {players.length} players in DB · {byTeam.size} teams.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Filtry</CardTitle>
+          <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="grid gap-3 md:grid-cols-3" action="" method="get">
@@ -78,7 +78,7 @@ export default async function LeagueDetail({ params, searchParams }: Props) {
               type="search"
               name="search"
               defaultValue={search ?? ""}
-              placeholder="Szukaj (nick, drużyna)..."
+              placeholder="Search (name, team)..."
               className="border rounded-md px-3 py-2 text-sm"
             />
             <select
@@ -86,7 +86,7 @@ export default async function LeagueDetail({ params, searchParams }: Props) {
               defaultValue={role ?? ""}
               className="border rounded-md px-3 py-2 text-sm bg-background"
             >
-              <option value="">Wszystkie role</option>
+              <option value="">All roles</option>
               {roles.map((r) => (
                 <option key={r} value={r}>
                   {r}
@@ -97,7 +97,7 @@ export default async function LeagueDetail({ params, searchParams }: Props) {
               type="submit"
               className={buttonVariants({ variant: "default", size: "default" })}
             >
-              Zastosuj
+              Apply
             </button>
           </form>
         </CardContent>
@@ -109,16 +109,16 @@ export default async function LeagueDetail({ params, searchParams }: Props) {
           <Card key={team}>
             <CardHeader>
               <CardTitle>{team}</CardTitle>
-              <CardDescription>{ps.length} graczy</CardDescription>
+              <CardDescription>{ps.length} players</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nick</TableHead>
-                    <TableHead>Rola</TableHead>
-                    <TableHead>Kraj</TableHead>
-                    <TableHead>Ostatni turniej</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Country</TableHead>
+                    <TableHead>Last tournament</TableHead>
                     <TableHead>Leaguepedia</TableHead>
                   </TableRow>
                 </TableHeader>

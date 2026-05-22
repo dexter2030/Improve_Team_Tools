@@ -33,18 +33,16 @@ ENV_PATH = PROJECT_ROOT / ".env"
 
 def render() -> None:
     """Renderuje zakładkę Settings. Wywołać raz w miejscu zakładki."""
-    st.title("🔧 Ustawienia")
+    st.title("🔧 Settings")
     st.caption(
-        "Klucze API zapisywane są do pliku .env w katalogu projektu. "
-        "Po zapisie wartości działają od razu — Streamlit czyści cache "
-        "klientów i tworzy ich na nowo z aktualnymi kluczami. "
-        "Aplikacja jest jednoosobowa, więc wartości pokazujemy jawnie."
+        "API keys are saved to .env in the project root. Values take effect "
+        "immediately — Streamlit clears the client cache and rebuilds them "
+        "with the current keys. Single-user app, so values are shown in plain text."
     )
 
     if not ENV_PATH.exists():
         st.info(
-            f"Plik `.env` nie istnieje — zostanie utworzony przy pierwszym "
-            f"zapisie:\n\n`{ENV_PATH}`"
+            f"`.env` does not exist — it will be created on first save:\n\n`{ENV_PATH}`"
         )
 
     # Komunikat z poprzedniej akcji — przeżywa st.rerun() w session_state.
@@ -59,11 +57,11 @@ def render() -> None:
     # --- Riot API -----------------------------------------------------------
     st.subheader("Riot API")
     st.caption(
-        "Klucz developerski wygasa co 24h — odśwież z "
-        "developer.riotgames.com i wklej poniżej."
+        "Dev key expires every 24h — refresh from "
+        "developer.riotgames.com and paste below."
     )
     new_riot = st.text_input(
-        "Klucz Riot",
+        "Riot key",
         value=current_riot,
         placeholder="RGAPI-...",
         key="settings_riot",
@@ -74,18 +72,18 @@ def render() -> None:
     # --- Leaguepedia --------------------------------------------------------
     st.subheader("Leaguepedia (bot-password)")
     st.caption(
-        "Bot-password tworzysz na **lol.fandom.com/Special:BotPasswords**. "
-        "Bez niego klient działa anonimowo (niższy limit API)."
+        "Create a bot-password at **lol.fandom.com/Special:BotPasswords**. "
+        "Without it the client runs anonymously (lower API limit)."
     )
     new_user = st.text_input(
-        "Login Leaguepedia",
+        "Leaguepedia username",
         value=current_user,
         placeholder="YourName@BotName",
-        help="Format: NazwaKonta@NazwaBota.",
+        help="Format: AccountName@BotName.",
         key="settings_lp_user",
     )
     new_pass = st.text_input(
-        "Hasło Leaguepedia",
+        "Leaguepedia password",
         value=current_pass,
         placeholder="...",
         key="settings_lp_pass",
@@ -94,14 +92,14 @@ def render() -> None:
     st.divider()
 
     col_save, col_clear, _ = st.columns([1, 1, 3])
-    if col_save.button("💾 Zapisz", type="primary",
+    if col_save.button("💾 Save", type="primary",
                        use_container_width=True):
         _save(new_riot, current_riot, new_user, current_user,
               new_pass, current_pass)
-    if col_clear.button("🧹 Wyczyść cache klientów",
+    if col_clear.button("🧹 Clear client cache",
                         use_container_width=True,
-                        help="Wymusza ponowne utworzenie klientów Riot "
-                             "i Leaguepedia z aktualnymi kluczami z .env."):
+                        help="Forces Riot + Leaguepedia clients to be rebuilt "
+                             "with the current keys from .env."):
         st.cache_resource.clear()
         try:
             from draft_analyzer.leaguepedia import reset_client
@@ -110,8 +108,7 @@ def render() -> None:
             pass
         st.session_state["settings_msg"] = (
             "ok",
-            "Cache klientów wyczyszczony — następne pobranie użyje "
-            "aktualnych kluczy."
+            "Client cache cleared — next fetch will use the current keys."
         )
         st.rerun()
 
@@ -134,7 +131,7 @@ def _save(
     if not updates:
         st.session_state["settings_msg"] = (
             "err",
-            "Nic do zapisania — wszystkie pola bez zmian."
+            "Nothing to save — all fields unchanged."
         )
         st.rerun()
         return
@@ -147,7 +144,7 @@ def _save(
             # Wstaw też do bieżącego procesu — działa od razu, bez restartu.
             os.environ[key] = value
     except Exception as e:
-        st.session_state["settings_msg"] = ("err", f"Błąd zapisu: {e}")
+        st.session_state["settings_msg"] = ("err", f"Save error: {e}")
         st.rerun()
         return
 
@@ -168,8 +165,7 @@ def _save(
 
     st.session_state["settings_msg"] = (
         "ok",
-        f"Zapisano: {', '.join(k for k, _ in updates)}. "
-        f"Klienci API zostali odświeżeni — następne pobranie użyje "
-        f"nowych kluczy."
+        f"Saved: {', '.join(k for k, _ in updates)}. "
+        f"API clients refreshed — next fetch will use the new keys."
     )
     st.rerun()

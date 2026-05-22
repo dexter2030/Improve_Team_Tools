@@ -1,14 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LEAGUE_GROUPS } from "@/lib/leaguepedia/leagues";
+
+const VISIBLE_PATCHES = 15;
 
 export function Filters({ patches }: { patches: string[] }) {
   const router = useRouter();
   const sp = useSearchParams();
   const activeLeagues = (sp.get("league") ?? "").split(",").filter(Boolean);
   const activePatches = (sp.get("patch") ?? "").split(",").filter(Boolean);
+  // Auto-expand gdy któryś aktywny patch jest poza pierwszymi 15 —
+  // inaczej user by go nie widział mimo, że jest w filtrze.
+  const hasHiddenActive = activePatches.some(
+    (p) => patches.indexOf(p) >= VISIBLE_PATCHES
+  );
+  const [showAllPatches, setShowAllPatches] = useState(hasHiddenActive);
 
   function update(key: string, values: string[]) {
     const next = new URLSearchParams(sp.toString());
@@ -37,15 +46,22 @@ export function Filters({ patches }: { patches: string[] }) {
     <div className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm font-medium">
-          Presety lig:
+          League presets:
           <Button size="xs" variant="outline" onClick={() => preset(LEAGUE_GROUPS.tier1)}>
             Tier 1
           </Button>
           <Button size="xs" variant="outline" onClick={() => preset([...LEAGUE_GROUPS.tier1, ...LEAGUE_GROUPS.erlD1])}>
             + ERL D1
           </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => preset([...LEAGUE_GROUPS.tier1, ...LEAGUE_GROUPS.erlD1, ...LEAGUE_GROUPS.erlD2])}
+          >
+            All
+          </Button>
           <Button size="xs" variant="outline" onClick={clear}>
-            Wyczyść
+            Clear
           </Button>
         </div>
 
@@ -71,44 +87,56 @@ export function Filters({ patches }: { patches: string[] }) {
       {patches.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm font-medium flex-wrap">
-            Presety patchy:
+            Patch presets:
             <Button
               size="xs"
               variant="outline"
               onClick={() => update("patch", patches.slice(0, 5))}
             >
-              Ostatnie 5
+              Last 5
             </Button>
             <Button
               size="xs"
               variant="outline"
               onClick={() => update("patch", patches.slice(0, 10))}
             >
-              Ostatnie 10
+              Last 10
             </Button>
             <Button
               size="xs"
               variant="outline"
               onClick={() => update("patch", [])}
             >
-              Wszystkie patche
+              All patches
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {patches.map((p) => (
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {(showAllPatches ? patches : patches.slice(0, VISIBLE_PATCHES)).map(
+              (p) => (
+                <button
+                  key={p}
+                  onClick={() => toggle("patch", p)}
+                  className={`text-xs px-2 py-1 rounded border transition-colors ${
+                    activePatches.includes(p)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+            {patches.length > VISIBLE_PATCHES && (
               <button
-                key={p}
-                onClick={() => toggle("patch", p)}
-                className={`text-xs px-2 py-1 rounded border transition-colors ${
-                  activePatches.includes(p)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border hover:bg-muted"
-                }`}
+                onClick={() => setShowAllPatches((v) => !v)}
+                className="text-xs px-2 py-1 rounded border border-dashed text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
-                {p}
+                {showAllPatches
+                  ? "Show less"
+                  : `Show ${patches.length - VISIBLE_PATCHES} more…`}
               </button>
-            ))}
+            )}
           </div>
         </div>
       )}

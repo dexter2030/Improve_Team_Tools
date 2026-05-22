@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: Props) {
         <div className="space-y-2 text-center">
           <h1 className="text-xl font-semibold">Improve Team Tools</h1>
           <p className="text-sm text-muted-foreground">
-            Strona prywatna — podaj hasło żeby kontynuować.
+            Private — enter password to continue.
           </p>
         </div>
         <LoginForm from={sp.from ?? "/scouting"} error={sp.error} />

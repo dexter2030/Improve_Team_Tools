@@ -11,15 +11,15 @@ export function ProfileActions({ id }: { id: string }) {
   const [pending, startTransition] = useTransition();
 
   function onDelete() {
-    if (!confirm("Na pewno usunąć ten profil? Operacja jest nieodwracalna.")) {
+    if (!confirm("Delete this profile? This cannot be undone.")) {
       return;
     }
     startTransition(async () => {
       try {
         await deleteProfileAction(id);
-        toast.success("Profil usunięty.");
+        toast.success("Profile deleted");
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Nie udało się usunąć.");
+        toast.error(err instanceof Error ? err.message : "Delete failed");
       }
     });
   }
@@ -28,12 +28,12 @@ export function ProfileActions({ id }: { id: string }) {
     startTransition(async () => {
       const result = await reResolveAction(id);
       if (!result.ok) {
-        toast.error(result.errors?.join(", ") ?? "Re-resolve nie powiodło się.");
+        toast.error(result.errors?.join(", ") ?? "Refresh failed");
         return;
       }
       const resolved = result.reports?.filter((r) => r.outcome === "resolved").length ?? 0;
       const total = result.reports?.length ?? 0;
-      toast.success(`Odświeżone: ${resolved}/${total} źródeł.`);
+      toast.success(`Refreshed: ${resolved}/${total} sources`);
     });
   }
 
@@ -44,17 +44,17 @@ export function ProfileActions({ id }: { id: string }) {
         size="sm"
         onClick={onReResolve}
         disabled={pending}
-        title="Odśwież dane z Riot + Leaguepedia"
+        title="Refresh data from Riot + Leaguepedia"
       >
         <RefreshCw className={`h-4 w-4 mr-1 ${pending ? "animate-spin" : ""}`} />
-        Odśwież
+        Refresh
       </Button>
       <Link
         href={`/scouting/${id}/edit`}
         className={buttonVariants({ variant: "outline", size: "sm" })}
       >
         <Pencil className="h-4 w-4 mr-1" />
-        Edytuj
+        Edit
       </Link>
       <Button
         variant="destructive"
@@ -63,7 +63,7 @@ export function ProfileActions({ id }: { id: string }) {
         disabled={pending}
       >
         <Trash2 className="h-4 w-4 mr-1" />
-        Usuń
+        Delete
       </Button>
     </div>
   );

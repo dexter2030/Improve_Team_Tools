@@ -36,7 +36,7 @@ export function ScoutingFilters() {
   return (
     <div className="grid gap-3 md:grid-cols-3">
       <Input
-        placeholder="Szukaj (nazwa, team, Leaguepedia)..."
+        placeholder="Search (name, team, Leaguepedia)..."
         defaultValue={sp.get("search") ?? ""}
         onChange={(e) => onSearch(e.target.value)}
       />
@@ -45,10 +45,10 @@ export function ScoutingFilters() {
         onValueChange={(v) => update("role", v)}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Wszystkie role" />
+          <SelectValue placeholder="All roles" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ALL}>Wszystkie role</SelectItem>
+          <SelectItem value={ALL}>All roles</SelectItem>
           {ROLES.map((r) => (
             <SelectItem key={r} value={r}>
               {r}
@@ -61,10 +61,10 @@ export function ScoutingFilters() {
         onValueChange={(v) => update("status", v)}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Wszystkie statusy" />
+          <SelectValue placeholder="All statuses" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ALL}>Wszystkie statusy</SelectItem>
+          <SelectItem value={ALL}>All statuses</SelectItem>
           {STATUSES.map((s) => (
             <SelectItem key={s} value={s}>
               {s}

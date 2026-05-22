@@ -39,16 +39,15 @@ export default async function DatabasePage() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Database</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Synchronizacja draftów z Leaguepedia. Pobieranie jest idempotentne
-          (powtórzenia są deduplikowane przez matchId).
+          Sync drafts from Leaguepedia. Idempotent — duplicates deduplicated by matchId.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Drafty w bazie" value={total} />
-        <StatCard label="Ligi z danymi" value={leaguesWithData} />
+        <StatCard label="Drafts in DB" value={total} />
+        <StatCard label="Leagues with data" value={leaguesWithData} />
         <StatCard
-          label="Wszystkie wspierane ligi"
+          label="All supported leagues"
           value={
             LEAGUE_GROUPS.tier1.length +
             LEAGUE_GROUPS.erlD1.length +
@@ -61,23 +60,23 @@ export default async function DatabasePage() {
 
       <LeagueSection
         title="Tier 1 — major leagues + international"
-        description="LEC, LCK, LPL, LCS oraz MSI/Worlds/First Stand."
+        description="LEC, LCK, LPL, LCS, plus MSI/Worlds/First Stand."
         leagues={LEAGUE_GROUPS.tier1}
         countsByLeague={countsByPrefix(byLeague)}
         syncMap={syncMap}
       />
 
       <LeagueSection
-        title="ERL — pierwsze dywizje"
-        description="Główne europejskie ligi regionalne."
+        title="ERL — first divisions"
+        description="Top European regional leagues."
         leagues={LEAGUE_GROUPS.erlD1}
         countsByLeague={countsByPrefix(byLeague)}
         syncMap={syncMap}
       />
 
       <LeagueSection
-        title="ERL — drugie dywizje"
-        description="Akademiki i dywizje rozwojowe."
+        title="ERL — second divisions"
+        description="Academy and development divisions."
         leagues={LEAGUE_GROUPS.erlD2}
         countsByLeague={countsByPrefix(byLeague)}
         syncMap={syncMap}
@@ -109,10 +108,10 @@ function LeagueSection({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Liga</TableHead>
-              <TableHead className="text-right">W bazie</TableHead>
-              <TableHead>Ostatnie wczytanie</TableHead>
-              <TableHead className="text-right">Akcja</TableHead>
+              <TableHead>League</TableHead>
+              <TableHead className="text-right">In DB</TableHead>
+              <TableHead>Last sync</TableHead>
+              <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -124,7 +123,7 @@ function LeagueSection({
                   <TableCell className="font-medium">{lg}</TableCell>
                   <TableCell className="text-right">{count}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {last ? new Date(last).toLocaleString("pl-PL") : "—"}
+                    {last ? new Date(last).toLocaleString("en-US") : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <SyncButton league={lg} hasData={count > 0} />

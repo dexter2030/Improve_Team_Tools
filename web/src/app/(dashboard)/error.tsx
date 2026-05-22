@@ -21,9 +21,9 @@ export default function DashboardError({
     <div className="max-w-2xl mx-auto py-12">
       <Alert variant="destructive">
         <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Coś padło przy renderowaniu strony</AlertTitle>
+        <AlertTitle>Page render error</AlertTitle>
         <AlertDescription className="space-y-3 mt-2">
-          <p className="text-sm">{error.message || "Nieznany błąd serwera."}</p>
+          <p className="text-sm">{error.message || "Unknown server error."}</p>
           {error.digest && (
             <p className="text-xs opacity-75">
               Trace ID:{" "}
@@ -34,7 +34,7 @@ export default function DashboardError({
           <div className="flex gap-2 pt-2">
             <Button onClick={reset} size="sm">
               <RefreshCw className="h-3.5 w-3.5 mr-1" />
-              Spróbuj ponownie
+              Try again
             </Button>
             <a
               href="/api/health"
@@ -42,7 +42,7 @@ export default function DashboardError({
               rel="noreferrer"
               className="text-xs underline self-center"
             >
-              Sprawdź /api/health
+              Check /api/health
             </a>
           </div>
         </AlertDescription>

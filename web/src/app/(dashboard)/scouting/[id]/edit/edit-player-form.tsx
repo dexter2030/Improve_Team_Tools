@@ -49,12 +49,12 @@ export function EditPlayerForm({
     startTransition(async () => {
       const result = await editProfileAction(id, formData);
       if (!result.ok) {
-        setErrors(result.errors ?? ["Nieznany błąd."]);
-        toast.error("Nie udało się zapisać.");
+        setErrors(result.errors ?? ["Unknown error."]);
+        toast.error("Save failed");
         return;
       }
       setReports(result.reports ?? []);
-      toast.success("Profil zaktualizowany.");
+      toast.success("Profile updated");
       setTimeout(() => router.push(`/scouting/${id}`), 1500);
     });
   }
@@ -63,7 +63,7 @@ export function EditPlayerForm({
     <form action={onSubmit} className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="displayName">Nazwa gracza *</Label>
+          <Label htmlFor="displayName">Player name *</Label>
           <Input
             id="displayName"
             name="displayName"
@@ -73,7 +73,7 @@ export function EditPlayerForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="role">Rola *</Label>
+          <Label htmlFor="role">Role *</Label>
           <Select value={role} onValueChange={(v) => setRole((v ?? "Mid") as Role)}>
             <SelectTrigger id="role">
               <SelectValue />
@@ -89,7 +89,7 @@ export function EditPlayerForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="age">Wiek</Label>
+          <Label htmlFor="age">Age</Label>
           <Input
             id="age"
             name="age"
@@ -101,7 +101,7 @@ export function EditPlayerForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="nationality">Kraj</Label>
+          <Label htmlFor="nationality">Country</Label>
           <Input
             id="nationality"
             name="nationality"
@@ -110,7 +110,7 @@ export function EditPlayerForm({
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="leaguepediaUrl">Link Leaguepedia</Label>
+          <Label htmlFor="leaguepediaUrl">Leaguepedia link</Label>
           <Input
             id="leaguepediaUrl"
             name="leaguepediaUrl"
@@ -119,7 +119,7 @@ export function EditPlayerForm({
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="lolprosUrl">Link lolpros</Label>
+          <Label htmlFor="lolprosUrl">lolpros link</Label>
           <Input
             id="lolprosUrl"
             name="lolprosUrl"
@@ -129,7 +129,7 @@ export function EditPlayerForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="opggUrls">Linki op.gg — jeden na linię</Label>
+        <Label htmlFor="opggUrls">op.gg links — one per line</Label>
         <Textarea
           id="opggUrls"
           name="opggUrls"
@@ -137,14 +137,13 @@ export function EditPlayerForm({
           defaultValue={initial.opggUrls.join("\n")}
         />
         <p className="text-xs text-muted-foreground">
-          Niezmienione konta zachowają cached statystyki. Nowe pójdą do
-          weryfikacji.
+          Unchanged accounts keep cached stats. New ones will be verified.
         </p>
       </div>
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? "Zapisuję..." : "Zapisz zmiany"}
+          {pending ? "Saving..." : "Save changes"}
         </Button>
         <Button
           type="button"
@@ -152,7 +151,7 @@ export function EditPlayerForm({
           onClick={() => router.push(`/scouting/${id}`)}
           disabled={pending}
         >
-          Anuluj
+          Cancel
         </Button>
       </div>
 
@@ -168,7 +167,7 @@ export function EditPlayerForm({
 
       {reports && reports.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Wynik weryfikacji</h3>
+          <h3 className="text-sm font-semibold">Verification result</h3>
           {reports.map((r, i) => (
             <div
               key={i}

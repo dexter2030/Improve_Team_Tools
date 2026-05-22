@@ -72,7 +72,7 @@ export function Sidebar() {
             className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent/60 text-sidebar-foreground/80 transition-colors"
           >
             <LogOut className="h-4 w-4 shrink-0" />
-            <span>Wyloguj</span>
+            <span>Sign out</span>
           </button>
         </form>
         <p className="px-3 pt-1 text-[10px] text-muted-foreground">

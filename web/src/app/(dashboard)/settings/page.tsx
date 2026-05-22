@@ -6,18 +6,18 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Ustawienia</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Settings</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Konfiguracja kluczy API i opcji aplikacji.
+          API keys and app options.
         </p>
       </div>
 
       <Alert>
         <Info className="h-4 w-4" />
-        <AlertTitle>Sekrety</AlertTitle>
+        <AlertTitle>Secrets</AlertTitle>
         <AlertDescription>
-          Na produkcji (Vercel) klucze ustawiasz w panelu Vercel → Environment Variables.
-          Lokalnie w pliku <code className="font-mono text-xs">web/.env.local</code>.
+          On prod (Vercel) set keys in Vercel → Environment Variables.
+          Locally in <code className="font-mono text-xs">web/.env.local</code>.
         </AlertDescription>
       </Alert>
 
@@ -25,11 +25,11 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Riot API key</CardTitle>
           <CardDescription>
-            Klucz developerski wygasa co 24h — production key wymaga zatwierdzenia wniosku.
+            Dev key expires every 24h — production key requires approval.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">(placeholder — Faza 9 doda UI)</p>
+          <p className="text-sm text-muted-foreground">(placeholder — UI coming later)</p>
         </CardContent>
       </Card>
     </div>

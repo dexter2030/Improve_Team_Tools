@@ -36,10 +36,9 @@ def render():
 
     st.title("🗄️ Database")
     st.caption(
-        "Stan lokalnej bazy draftów — kiedy która liga była wczytywana "
-        "i w ilu procentach jest kompletna względem Leaguepedia. "
-        "Pobieranie jest przyrostowe: ten sam mecz nie jest pobierany "
-        "dwa razy."
+        "Local draft database state — when each league was synced and how "
+        "complete it is vs. Leaguepedia. Incremental fetch: the same match "
+        "is never fetched twice."
     )
 
     # Tryb dostępu do Leaguepedia — bot-password podnosi limit zapytań.
@@ -58,15 +57,15 @@ def render():
     )
 
     m1, m2 = st.columns(2)
-    m1.metric("Draftów w bazie", count_all_drafts())
-    m2.metric("Ligi wczytane", f"{n_loaded} / {len(all_leagues)}")
+    m1.metric("Drafts in DB", count_all_drafts())
+    m2.metric("Leagues synced", f"{n_loaded} / {len(all_leagues)}")
 
     full_refresh = st.checkbox(
-        "Pełne odświeżenie (ignoruj kursor przyrostowy)",
-        help="Domyślnie wczytywanie dokłada tylko mecze nowsze niż "
-             "ostatnio pobrane. Zaznacz, by pobrać ligę całą od nowa.",
+        "Full refresh (ignore incremental cursor)",
+        help="By default fetch only adds matches newer than the last sync. "
+             "Check to refetch the league from scratch.",
     )
-    if st.button("⬇️ Wczytaj wszystkie ligi", use_container_width=True):
+    if st.button("⬇️ Fetch all leagues", use_container_width=True):
         _fetch_and_report(all_leagues, full_refresh)
 
     st.divider()
@@ -83,7 +82,7 @@ def _league_rows(leagues: list[str], sync: dict, full_refresh: bool) -> None:
     """Renderuje nagłówek i po jednym wierszu na ligę z przyciskiem wczytania."""
     header = st.columns(_COLS, vertical_alignment="center")
     for col, title in zip(
-        header, ["Liga", "W bazie", "Kompletność", "Ostatnie wczytanie", ""]
+        header, ["League", "In DB", "Completeness", "Last sync", ""]
     ):
         col.caption(title)
 
@@ -105,13 +104,13 @@ def _league_rows(leagues: list[str], sync: dict, full_refresh: bool) -> None:
             pct = min(local / remote, 1.0)
             c_pct.progress(pct, text=f"{pct:.0%} ({local}/{remote})")
         elif remote == 0:
-            c_pct.caption("brak draftów na Leaguepedia")
+            c_pct.caption("no drafts on Leaguepedia")
         else:
-            c_pct.caption("— wczytaj, by policzyć")
+            c_pct.caption("— fetch to count")
 
         c_last.write(_fmt_dt(last_fetched) if last_fetched else "—")
 
-        label = "↻ Odśwież" if last_fetched else "⬇️ Wczytaj"
+        label = "↻ Refresh" if last_fetched else "⬇️ Fetch"
         if c_btn.button(label, key=f"db_load_{lg}",
                         use_container_width=True):
             _fetch_and_report([lg], full_refresh)
@@ -129,20 +128,20 @@ def _fetch_and_report(leagues: list[str], full_refresh: bool) -> None:
     górze zakładki po przeładowaniu — wtedy tabela ma już świeże dane.
     """
     n = len(leagues)
-    bar = st.progress(0.0, text="Łączę się z Leaguepedia…")
+    bar = st.progress(0.0, text="Connecting to Leaguepedia…")
     outcomes: list[FetchOutcome] = []
     for i, lg in enumerate(leagues):
-        bar.progress(i / n, text=f"Wczytuję {lg}… ({i + 1}/{n})")
+        bar.progress(i / n, text=f"Fetching {lg}… ({i + 1}/{n})")
 
         def on_batch(fetched: int, saved: int, _lg=lg, _i=i) -> None:
             bar.progress(
-                _i / n, text=f"{_lg}: pobrano {fetched}, zapisano {saved}"
+                _i / n, text=f"{_lg}: fetched {fetched}, saved {saved}"
             )
 
         outcomes.append(
             fetch_league(lg, full_refresh=full_refresh, on_batch=on_batch)
         )
-    bar.progress(1.0, text="Gotowe.")
+    bar.progress(1.0, text="Done.")
 
     st.session_state["db_msg"] = _summary(outcomes)
     st.rerun()
@@ -155,19 +154,19 @@ def _summary(outcomes: list[FetchOutcome]) -> tuple[str, str]:
     truncated = [o for o in outcomes if o.truncated and not o.error]
 
     lines = [
-        f"Wczytano ligi: {len(outcomes)} · zapisano {saved} nowych draftów."
+        f"Synced {len(outcomes)} leagues · saved {saved} new drafts."
     ]
     for o in errors:
         lines.append(
-            f"❌ **{o.league}** — pobieranie przerwał błąd: {o.error}. "
-            f"Już zapisane drafty zostają; ponów wczytanie (jest "
-            f"idempotentne — dołoży tylko brakujące)."
+            f"❌ **{o.league}** — fetch failed: {o.error}. "
+            f"Already-saved drafts stay; retry the sync (idempotent — "
+            f"only missing drafts will be added)."
         )
     for o in truncated:
         lines.append(
-            f"⚠️ **{o.league}** — osiągnięto limit {o.fetched} wierszy. "
-            f"Starsze mecze mogą być niepobrane; zawęź filtrem sezonu "
-            f"w zakładce Draft Analyzer."
+            f"⚠️ **{o.league}** — hit limit of {o.fetched} rows. "
+            f"Older matches may not have been fetched; narrow by season "
+            f"filter in the Draft Analyzer tab."
         )
     level = "err" if errors else ("warn" if truncated else "ok")
     return level, "\n\n".join(lines)

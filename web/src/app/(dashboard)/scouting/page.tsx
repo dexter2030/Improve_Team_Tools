@@ -76,16 +76,16 @@ export default async function ScoutingListPage({ searchParams }: Props) {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Tracked players</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Lista obserwowanych zawodników z rozwiązanymi tożsamościami SoloQ i pro-play.
+            With resolved SoloQ and pro-play identities.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <a
             href="/api/scouting/export"
             className={buttonVariants({ variant: "outline" })}
-            title="Pobierz wszystkie profile jako CSV"
+            title="Download all profiles as CSV"
           >
-            📤 Eksport CSV
+            📤 Export CSV
           </a>
           <Link
             href="/scouting/import"
@@ -95,7 +95,7 @@ export default async function ScoutingListPage({ searchParams }: Props) {
           </Link>
           <Link href="/scouting/add" className={buttonVariants()}>
             <UserPlus className="h-4 w-4 mr-2" />
-            Dodaj gracza
+            Add player
           </Link>
         </div>
       </div>
@@ -110,11 +110,11 @@ export default async function ScoutingListPage({ searchParams }: Props) {
       {all.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Filtry</CardTitle>
+            <CardTitle>Filters</CardTitle>
             <CardDescription>
               {hasFilter
-                ? `${profiles.length} z ${all.length} pasuje do filtrów.`
-                : "Wszystkie profile pokazane."}
+                ? `${profiles.length} of ${all.length} match the filters.`
+                : "All profiles shown."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -126,16 +126,16 @@ export default async function ScoutingListPage({ searchParams }: Props) {
       {all.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Pusto</CardTitle>
+            <CardTitle>Empty</CardTitle>
             <CardDescription>
-              Nie ma jeszcze żadnych zawodników. Dodaj pierwszego w zakładce <strong>Add Player</strong>.
+              No players yet. Add one in the <strong>Add Player</strong> tab.
             </CardDescription>
           </CardHeader>
         </Card>
       ) : profiles.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Żaden profil nie spełnia filtrów.
+            No profiles match the filters.
           </CardContent>
         </Card>
       ) : (
@@ -144,10 +144,10 @@ export default async function ScoutingListPage({ searchParams }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nazwa</TableHead>
-                  <TableHead>Rola</TableHead>
-                  <TableHead>Wiek</TableHead>
-                  <TableHead>Kraj</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Age</TableHead>
+                  <TableHead>Country</TableHead>
                   <TableHead>op.gg</TableHead>
                   <TableHead>Top level</TableHead>
                   <TableHead>Leaguepedia</TableHead>

@@ -52,10 +52,10 @@ export default async function MatchDataPage({ searchParams }: Props) {
         <Header />
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>Brak draftów</AlertTitle>
+          <AlertTitle>No drafts</AlertTitle>
           <AlertDescription>
-            Wczytaj drafty w zakładce <strong>Database</strong>, aby zobaczyć
-            pełny widok pick &amp; ban.
+            Load drafts in the <strong>Database</strong> tab to see the full
+            pick &amp; ban view.
           </AlertDescription>
         </Alert>
       </div>
@@ -80,11 +80,11 @@ export default async function MatchDataPage({ searchParams }: Props) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Filtry</CardTitle>
+          <CardTitle>Filters</CardTitle>
           <CardDescription>
             {filtered.length === total
-              ? `Wszystkie ${total} draftów.`
-              : `${filtered.length} z ${total} draftów.`}
+              ? `All ${total} drafts.`
+              : `${filtered.length} of ${total} drafts.`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -94,10 +94,10 @@ export default async function MatchDataPage({ searchParams }: Props) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Drafty</CardTitle>
+          <CardTitle>Drafts</CardTitle>
           <CardDescription>
-            Pełna sekwencja pick &amp; ban w kolejności draftu (B1/R1/R2/B2/B3/R3/B4/B5/R4/R5).
-            Pierwsze {Math.min(100, filtered.length)} wyników.
+            Full pick &amp; ban sequence in draft order (B1/R1/R2/B2/B3/R3/B4/B5/R4/R5).
+            First {Math.min(100, filtered.length)} results.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
@@ -105,16 +105,16 @@ export default async function MatchDataPage({ searchParams }: Props) {
             <thead className="border-b bg-muted/40">
               <tr className="text-left text-muted-foreground">
                 <th className="px-2 py-2 font-medium">Patch</th>
-                <th className="px-2 py-2 font-medium">Data</th>
-                <th className="px-2 py-2 font-medium">Liga</th>
+                <th className="px-2 py-2 font-medium">Date</th>
+                <th className="px-2 py-2 font-medium">League</th>
                 <th className="px-2 py-2 font-medium text-right">Blue</th>
                 <th className="px-2 py-2 font-medium">vs</th>
                 <th className="px-2 py-2 font-medium">Red</th>
-                <th className="px-2 py-2 font-medium text-center">Bany fazy 1</th>
-                <th className="px-2 py-2 font-medium text-center">Picki fazy 1</th>
-                <th className="px-2 py-2 font-medium text-center">Bany fazy 2</th>
-                <th className="px-2 py-2 font-medium text-center">Picki fazy 2</th>
-                <th className="px-2 py-2 font-medium">Wygrana</th>
+                <th className="px-2 py-2 font-medium text-center">Phase 1 bans</th>
+                <th className="px-2 py-2 font-medium text-center">Phase 1 picks</th>
+                <th className="px-2 py-2 font-medium text-center">Phase 2 bans</th>
+                <th className="px-2 py-2 font-medium text-center">Phase 2 picks</th>
+                <th className="px-2 py-2 font-medium">Winner</th>
               </tr>
             </thead>
             <tbody>
@@ -123,7 +123,7 @@ export default async function MatchDataPage({ searchParams }: Props) {
                   <td className="px-2 py-2 font-mono">{d.patch ?? "—"}</td>
                   <td className="px-2 py-2 text-muted-foreground whitespace-nowrap">
                     {d.gameDate
-                      ? new Date(d.gameDate).toLocaleDateString("pl-PL", {
+                      ? new Date(d.gameDate).toLocaleDateString("en-US", {
                           year: "2-digit",
                           month: "2-digit",
                           day: "2-digit",
@@ -246,8 +246,8 @@ function Header() {
     <div>
       <h2 className="text-2xl font-semibold tracking-tight">Match Data</h2>
       <p className="text-sm text-muted-foreground mt-1">
-        Pełen widok pick &amp; ban — wszystkie 20 slotów w kolejności draftu.
-        Filtry zmieniają URL — możesz udostępniać widoki.
+        Full pick &amp; ban view — all 20 slots in draft order. URL-driven filters
+        — views are shareable.
       </p>
     </div>
   );
