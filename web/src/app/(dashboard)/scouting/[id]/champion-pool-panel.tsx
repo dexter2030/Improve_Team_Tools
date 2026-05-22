@@ -24,7 +24,7 @@ export async function ChampionPoolPanel({
   if (!proplay || !proplay.leaguepediaLink) {
     return (
       <p className="text-sm text-muted-foreground">
-        Brak rozwiązanej tożsamości pro-play — champion pool niedostępny.
+        No verified pro-play link — champion pool unavailable.
       </p>
     );
   }
@@ -35,7 +35,7 @@ export async function ChampionPoolPanel({
     if (rows.length === 0) {
       return (
         <p className="text-sm text-muted-foreground">
-          Brak gier pro tego gracza na Leaguepedia.
+          No pro games for this player on Leaguepedia.
         </p>
       );
     }
@@ -43,7 +43,7 @@ export async function ChampionPoolPanel({
     return (
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
-          {rows.length} gier · {stats.length} championów (top 15)
+          {rows.length} games · {stats.length} champions (top 15)
         </p>
         <Table>
           <TableHeader>
@@ -89,7 +89,7 @@ export async function ChampionPoolPanel({
     const msg = err instanceof Error ? err.message : String(err);
     return (
       <p className="text-sm text-amber-700 dark:text-amber-400">
-        Nie udało się pobrać champion pool: {msg}
+        Champion pool fetch failed: {msg}
       </p>
     );
   }

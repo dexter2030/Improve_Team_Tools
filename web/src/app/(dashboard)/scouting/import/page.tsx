@@ -15,25 +15,24 @@ export default function ImportPage() {
           href="/scouting"
           className={`${buttonVariants({ variant: "ghost", size: "sm" })} mb-2 -ml-2`}
         >
-          <ArrowLeft className="h-4 w-4 mr-1" /> Z powrotem do listy
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to list
         </Link>
         <h2 className="text-2xl font-semibold tracking-tight">
-          Bulk import z CSV / TSV
+          Bulk import from CSV / TSV
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Wklej dane z Excela / Google Sheets. Każdy wiersz =
-          jeden gracz, automatycznie zweryfikowany przez Riot + Leaguepedia.
-          Błędy per-wiersz nie blokują pozostałych.
+          Paste data from Excel / Google Sheets. One row = one player,
+          auto-verified against Riot + Leaguepedia. Per-row errors don&apos;t block the rest.
         </p>
       </div>
 
       <div className="rounded-lg border bg-card p-4 space-y-2">
-        <h3 className="text-sm font-semibold">Wymagany format</h3>
+        <h3 className="text-sm font-semibold">Required format</h3>
         <p className="text-xs text-muted-foreground">
-          Header obowiązkowy. Separator: tab (z Excela) <em>lub</em> przecinek.
-          Kolumny: <code className="text-xs">displayName</code> + <code className="text-xs">role</code> (wymagane),
-          oraz opcjonalnie <code className="text-xs">age</code>, <code className="text-xs">nationality</code>,
-          <code className="text-xs">opggUrls</code> (wiele rozdzielonych "|"),
+          Header required. Separator: tab (from Excel) <em>or</em> comma.
+          Columns: <code className="text-xs">displayName</code> + <code className="text-xs">role</code> (required),
+          plus optional <code className="text-xs">age</code>, <code className="text-xs">nationality</code>,
+          <code className="text-xs">opggUrls</code> (multiple separated by &quot;|&quot;),
           <code className="text-xs">leaguepediaUrl</code>,{" "}
           <code className="text-xs">lolprosUrl</code>, <code className="text-xs">notes</code>.
         </p>

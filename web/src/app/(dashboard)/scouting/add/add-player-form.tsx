@@ -33,15 +33,15 @@ export function AddPlayerForm() {
     startTransition(async () => {
       const result = await addProfileAction(formData);
       if (!result.ok) {
-        setErrors(result.errors ?? ["Nieznany błąd."]);
-        toast.error("Nie udało się dodać profilu.");
+        setErrors(result.errors ?? ["Unknown error."]);
+        toast.error("Failed to add profile");
         return;
       }
       setReports(result.reports ?? []);
-      toast.success("Profil dodany — kliknij żeby zobaczyć szczegóły.", {
+      toast.success("Profile added — click to see details", {
         action: result.profileId
           ? {
-              label: "Otwórz",
+              label: "Open",
               onClick: () => router.push(`/scouting/${result.profileId}`),
             }
           : undefined,
@@ -56,17 +56,17 @@ export function AddPlayerForm() {
     <form action={onSubmit} className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="displayName">Nazwa gracza *</Label>
+          <Label htmlFor="displayName">Player name *</Label>
           <Input
             id="displayName"
             name="displayName"
-            placeholder="Jak go nazywasz"
+            placeholder="Display name"
             required
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="role">Rola *</Label>
+          <Label htmlFor="role">Role *</Label>
           <Select value={role} onValueChange={(v) => setRole(v ?? "Mid")}>
             <SelectTrigger id="role">
               <SelectValue />
@@ -82,7 +82,7 @@ export function AddPlayerForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="age">Wiek</Label>
+          <Label htmlFor="age">Age</Label>
           <Input
             id="age"
             name="age"
@@ -94,12 +94,12 @@ export function AddPlayerForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="nationality">Kraj</Label>
-          <Input id="nationality" name="nationality" placeholder="np. Polska" />
+          <Label htmlFor="nationality">Country</Label>
+          <Input id="nationality" name="nationality" placeholder="e.g. Poland" />
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="leaguepediaUrl">Link Leaguepedia</Label>
+          <Label htmlFor="leaguepediaUrl">Leaguepedia link</Label>
           <Input
             id="leaguepediaUrl"
             name="leaguepediaUrl"
@@ -108,7 +108,7 @@ export function AddPlayerForm() {
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="lolprosUrl">Link lolpros</Label>
+          <Label htmlFor="lolprosUrl">lolpros link</Label>
           <Input
             id="lolprosUrl"
             name="lolprosUrl"
@@ -118,33 +118,33 @@ export function AddPlayerForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="opggUrls">Linki op.gg — jeden na linię</Label>
+        <Label htmlFor="opggUrls">op.gg links — one per line</Label>
         <Textarea
           id="opggUrls"
           name="opggUrls"
           rows={4}
           placeholder={
-            "https://op.gg/lol/summoners/euw/Nazwa-TAG\nhttps://op.gg/lol/summoners/kr/Inne-TAG"
+            "https://op.gg/lol/summoners/euw/Name-TAG\nhttps://op.gg/lol/summoners/kr/Other-TAG"
           }
         />
         <p className="text-xs text-muted-foreground">
-          Każdy link op.gg to osobne konto SoloQ — dodaj ich dowolnie wiele.
+          Each op.gg link is a separate SoloQ account — add as many as you like.
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="notes">Notatka</Label>
+        <Label htmlFor="notes">Notes</Label>
         <Textarea
           id="notes"
           name="notes"
           rows={5}
-          placeholder="Twoja ocena gracza..."
+          placeholder="Your scouting notes..."
         />
       </div>
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? "Weryfikuję..." : "Dodaj i zweryfikuj"}
+          {pending ? "Verifying..." : "Add and verify"}
         </Button>
         <Button
           type="button"
@@ -152,7 +152,7 @@ export function AddPlayerForm() {
           onClick={() => router.push("/scouting")}
           disabled={pending}
         >
-          Anuluj
+          Cancel
         </Button>
       </div>
 
@@ -168,7 +168,7 @@ export function AddPlayerForm() {
 
       {reports && reports.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Wynik weryfikacji</h3>
+          <h3 className="text-sm font-semibold">Verification result</h3>
           {reports.map((r, i) => (
             <div
               key={i}

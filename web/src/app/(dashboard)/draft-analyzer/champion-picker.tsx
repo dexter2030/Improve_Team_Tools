@@ -85,7 +85,7 @@ export function ChampionPicker({
       <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
         <DialogHeader className="p-4 pb-2">
           <DialogTitle className="text-sm">
-            <span className="text-muted-foreground">{kind === "ban" ? "Ban" : "Pick"} dla slotu</span>{" "}
+            <span className="text-muted-foreground">{kind === "ban" ? "Ban" : "Pick"} for slot</span>{" "}
             <span className={`inline-block px-2 py-0.5 rounded font-mono text-xs border ${accent}`}>
               {slotLabel}
             </span>
@@ -133,7 +133,7 @@ export function ChampionPicker({
                     onPick(c.name);
                     onOpenChange(false);
                   }}
-                  title={c.name + (isUsed ? " (już w drafcie)" : "")}
+                  title={c.name + (isUsed ? " (already in draft)" : "")}
                   className={`relative aspect-square rounded overflow-hidden border-2 transition-all ${
                     isUsed
                       ? "border-transparent opacity-30 cursor-not-allowed"
@@ -152,14 +152,14 @@ export function ChampionPicker({
           </div>
           {filtered.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Brak championów pasujących do "{query}".
+              No champions matching &quot;{query}&quot;.
             </p>
           )}
         </div>
 
         <div className="px-4 py-3 border-t bg-muted/30 flex items-center justify-between text-xs">
           <span className="text-muted-foreground">
-            {filtered.length} championów{filtered[0] ? ` · ENTER = ${filtered[0].name}` : ""}
+            {filtered.length} champions{filtered[0] ? ` · ENTER = ${filtered[0].name}` : ""}
           </span>
           <Button
             variant="ghost"
@@ -167,7 +167,7 @@ export function ChampionPicker({
             onClick={() => onOpenChange(false)}
           >
             <X className="h-3 w-3 mr-1" />
-            Anuluj
+            Cancel
           </Button>
         </div>
       </DialogContent>

@@ -23,14 +23,14 @@ export default async function EditProfilePage({ params }: Props) {
           href={`/scouting/${id}`}
           className={`${buttonVariants({ variant: "ghost", size: "sm" })} mb-2 -ml-2`}
         >
-          <ArrowLeft className="h-4 w-4 mr-1" /> Z powrotem do profilu
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to profile
         </Link>
         <h2 className="text-2xl font-semibold tracking-tight">
-          Edytuj {profile.displayName}
+          Edit {profile.displayName}
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Zmiany w linkach Riot ID / Leaguepedia uruchomią ponowną weryfikację.
-          Statystyki SoloQ niezmienionych kont zostaną zachowane (cache).
+          Changes to Riot ID / Leaguepedia links trigger re-verification.
+          SoloQ stats for unchanged accounts are kept (cache).
         </p>
       </div>
       <EditPlayerForm

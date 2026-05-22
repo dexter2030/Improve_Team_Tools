@@ -79,19 +79,18 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Draft Analyzer</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Statystyki pick &amp; ban + interaktywny board. Zmiana presetu lig
-          albo patcha automatycznie aktualizuje sugestie obok slotów.
+          Pick &amp; ban stats + interactive board. Changing league preset or patch
+          updates the slot suggestions live.
         </p>
       </div>
 
       {total === 0 && (
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>Brak draftów w bazie</AlertTitle>
+          <AlertTitle>No drafts in DB</AlertTitle>
           <AlertDescription>
-            Najpierw wczytaj drafty w zakładce <strong>Database</strong>. Po
-            synchronizacji wróć tutaj — statystyki, sugestie i wyszukiwarka
-            zaczną pokazywać dane.
+            Load drafts in the <strong>Database</strong> tab first. After sync,
+            return here — stats, suggestions and search will start showing data.
           </AlertDescription>
         </Alert>
       )}
@@ -99,11 +98,11 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
       {total > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Filtry</CardTitle>
+            <CardTitle>Filters</CardTitle>
             <CardDescription>
               {filtered.length === total
-                ? `Wszystkie ${total} draftów w bazie.`
-                : `${filtered.length} z ${total} draftów spełnia filtry lig/patchy.`}
+                ? `All ${total} drafts in DB.`
+                : `${filtered.length} of ${total} drafts match league/patch filters.`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -117,8 +116,8 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Draft Board</CardTitle>
             <CardDescription>
-              Klikaj sloty żeby zbudować wzorzec. Top 5 sugestii pojawia się
-              obok każdego pustego slotu (na podstawie filtrowanych draftów).
+              Click slots to build a pattern. Top 5 suggestions appear next to
+              each empty slot (based on filtered drafts).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -136,11 +135,11 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
       {total > 0 && hasPattern && (
         <Card>
           <CardHeader>
-            <CardTitle>Pasujące drafty</CardTitle>
+            <CardTitle>Matching drafts</CardTitle>
             <CardDescription>
               {matches.length === 0
-                ? "Brak pasujących — rozluźnij wzorzec lub zmień filtry."
-                : `Znaleziono ${matches.length}. Pokazuję pierwsze 30.`}
+                ? "No matches — relax the pattern or change filters."
+                : `Found ${matches.length}. Showing first 30.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
@@ -158,7 +157,7 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
               <CardHeader>
                 <CardTitle>Top first picks (B1)</CardTitle>
                 <CardDescription>
-                  Najczęstszy pierwszy pick wśród filtrowanych draftów.
+                  Most common first pick across filtered drafts.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -170,7 +169,7 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
               <CardHeader>
                 <CardTitle>Top first-phase bans</CardTitle>
                 <CardDescription>
-                  Najczęstsze bany fazy 1 (pierwsze 3 bany per strona).
+                  Most common phase 1 bans (first 3 bans per side).
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -192,9 +191,9 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Ostatnie drafty</CardTitle>
+              <CardTitle>Recent drafts</CardTitle>
               <CardDescription>
-                50 najnowszych draftów spełniających filtry lig/patchy.
+                50 most recent drafts matching league/patch filters.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
@@ -255,12 +254,12 @@ function DraftsTable({ drafts }: { drafts: DraftRow[] }) {
       <thead className="border-b bg-muted/40">
         <tr className="text-left text-muted-foreground">
           <th className="px-3 py-2 font-medium">Patch</th>
-          <th className="px-3 py-2 font-medium">Liga</th>
+          <th className="px-3 py-2 font-medium">League</th>
           <th className="px-3 py-2 font-medium">Blue</th>
           <th className="px-3 py-2 font-medium">vs</th>
           <th className="px-3 py-2 font-medium">Red</th>
           <th className="px-3 py-2 font-medium">Pickset (Blue / Red)</th>
-          <th className="px-3 py-2 font-medium">Wygrana</th>
+          <th className="px-3 py-2 font-medium">Winner</th>
         </tr>
       </thead>
       <tbody>
@@ -321,7 +320,7 @@ async function ChampionList({
   entries: { champion: string; count: number; pct: number }[];
 }) {
   if (entries.length === 0) {
-    return <p className="text-sm text-muted-foreground">Brak danych.</p>;
+    return <p className="text-sm text-muted-foreground">No data.</p>;
   }
   return (
     <ul className="space-y-1.5">

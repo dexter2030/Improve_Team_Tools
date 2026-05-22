@@ -32,7 +32,7 @@ export async function RankedPanel({ accounts }: { accounts: readonly SoloQIdenti
   if (resolved.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Brak rozwiązanych kont SoloQ — ranked data niedostępna.
+        No resolved SoloQ accounts — ranked data unavailable.
       </p>
     );
   }
@@ -68,11 +68,11 @@ export async function RankedPanel({ accounts }: { accounts: readonly SoloQIdenti
           </div>
           {error ? (
             <p className="text-sm text-amber-700 dark:text-amber-400">
-              Nie udało się pobrać: {error}
+              Fetch failed: {error}
             </p>
           ) : entries.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              Unranked — brak gier ranked w tym sezonie.
+              Unranked — no ranked games this season.
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">

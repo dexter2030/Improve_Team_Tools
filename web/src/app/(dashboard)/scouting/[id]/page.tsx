@@ -40,7 +40,7 @@ export default async function ProfileDetailPage({ params }: Props) {
             href="/scouting"
             className={`${buttonVariants({ variant: "ghost", size: "sm" })} mb-2 -ml-2`}
           >
-            <ArrowLeft className="h-4 w-4 mr-1" /> Wszyscy gracze
+            <ArrowLeft className="h-4 w-4 mr-1" /> All players
           </Link>
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-semibold tracking-tight">
@@ -49,14 +49,14 @@ export default async function ProfileDetailPage({ params }: Props) {
             <StatusBadge state={profile.resolutionState} />
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {profile.role} · {profile.age ?? "—"} lat · {profile.nationality ?? "—"}
+            {profile.role} · age {profile.age ?? "—"} · {profile.nationality ?? "—"}
           </p>
         </div>
         <ProfileActions id={profile.profileId} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard label="Rola" value={profile.role} />
+        <StatCard label="Role" value={profile.role} />
         <StatCard
           label="op.gg accounts"
           value={profile.soloq.length ? `${nResolved}/${profile.soloq.length}` : "—"}
@@ -75,7 +75,7 @@ export default async function ProfileDetailPage({ params }: Props) {
         <CardHeader>
           <CardTitle>Ranked stats</CardTitle>
           <CardDescription>
-            Live z Riot League-V4. Cache: 1h (LP/tier zmienia się w trakcie gry).
+            Live from Riot League-V4. Cache: 1h (LP/tier shifts during play).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -89,7 +89,7 @@ export default async function ProfileDetailPage({ params }: Props) {
         <CardHeader>
           <CardTitle>Champion pool (pro play)</CardTitle>
           <CardDescription>
-            Agregacja per champion z Leaguepedia ScoreboardPlayers. Cache 6h.
+            Per-champion aggregation from Leaguepedia ScoreboardPlayers. Cache 6h.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -103,12 +103,12 @@ export default async function ProfileDetailPage({ params }: Props) {
         <CardHeader>
           <CardTitle>SoloQ accounts (op.gg)</CardTitle>
           <CardDescription>
-            Konta wyciągnięte z linków op.gg, zweryfikowane przez Riot API.
+            Accounts parsed from op.gg links, verified via Riot API.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {profile.soloq.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Brak kont SoloQ na tym profilu.</p>
+            <p className="text-sm text-muted-foreground">No SoloQ accounts on this profile.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {profile.soloq.map((s, i) => (
@@ -144,7 +144,7 @@ export default async function ProfileDetailPage({ params }: Props) {
           <CardHeader>
             <CardTitle>Pro play (Leaguepedia)</CardTitle>
             <CardDescription>
-              Tożsamość pro-play połączona po canonical wiki page name.
+              Pro-play identity joined on the canonical wiki page name.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
@@ -182,7 +182,7 @@ export default async function ProfileDetailPage({ params }: Props) {
         <CardHeader>
           <CardTitle>Scouting notes</CardTitle>
           <CardDescription>
-            Twoje obserwacje. Zapisuje się na Save.
+            Your observations. Saved on Save.
           </CardDescription>
         </CardHeader>
         <CardContent>

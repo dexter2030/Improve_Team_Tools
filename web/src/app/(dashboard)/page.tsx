@@ -66,8 +66,7 @@ export default async function Home() {
           Improve Team Tools
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Overview dashboard. Wybierz zakładkę po lewej, lub kliknij metrykę
-          żeby przeskoczyć do źródła.
+          Overview dashboard. Pick a tab on the left, or click a metric to jump to its source.
         </p>
       </div>
 
@@ -89,40 +88,40 @@ export default async function Home() {
         />
         <StatCard
           icon={<Trophy className="h-5 w-5" />}
-          label="Drafty w bazie"
-          value={draftsTotal.toLocaleString("pl-PL")}
+          label="Drafts in DB"
+          value={draftsTotal.toLocaleString("en-US")}
           href="/draft-analyzer"
           extra={
             <p className="text-xs text-muted-foreground mt-2">
               {draftLeagueSync.length > 0
-                ? `${draftLeagueSync.length} lig zsynchronizowanych`
-                : "Brak sync — wczytaj w Database"}
+                ? `${draftLeagueSync.length} leagues synced`
+                : "No sync — load in Database"}
             </p>
           }
         />
         <StatCard
           icon={<LineChart className="h-5 w-5" />}
           label="Players (global)"
-          value={playersTotal.toLocaleString("pl-PL")}
+          value={playersTotal.toLocaleString("en-US")}
           href="/players-data"
           extra={
             <p className="text-xs text-muted-foreground mt-2">
               {playersSync?.lastFetched
-                ? `Sync: ${new Date(playersSync.lastFetched).toLocaleDateString("pl-PL")}`
-                : "Pierwszy sync zajmie ~20s"}
+                ? `Sync: ${new Date(playersSync.lastFetched).toLocaleDateString("en-US")}`
+                : "First sync ~20s"}
             </p>
           }
         />
         <StatCard
           icon={<Database className="h-5 w-5" />}
-          label="Players (per liga)"
+          label="Players (per league)"
           value={leagueSyncStates.reduce((sum, s) => sum + (s.count ?? 0), 0)}
           href="/players-data/league"
           extra={
             <p className="text-xs text-muted-foreground mt-2">
               {leagueSyncStates.length > 0
-                ? `${leagueSyncStates.length} lig`
-                : "Wybierz ligę do synchronizacji"}
+                ? `${leagueSyncStates.length} leagues`
+                : "Pick a league to sync"}
             </p>
           }
         />
@@ -131,18 +130,18 @@ export default async function Home() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Ostatnio dodane profile</CardTitle>
-            <CardDescription>5 najnowszych.</CardDescription>
+            <CardTitle>Recently added profiles</CardTitle>
+            <CardDescription>5 most recent.</CardDescription>
           </CardHeader>
           <CardContent>
             {recent.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Brak profili.{" "}
+                No profiles.{" "}
                 <Link
                   href="/scouting/add"
                   className="text-primary hover:underline"
                 >
-                  Dodaj pierwszego
+                  Add the first one
                 </Link>
                 .
               </p>
@@ -172,19 +171,19 @@ export default async function Home() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Ostatnie synchronizacje</CardTitle>
-            <CardDescription>Drafty + Players per liga.</CardDescription>
+            <CardTitle>Recent syncs</CardTitle>
+            <CardDescription>Drafts + Players (per league).</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div>
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                Drafty
+                Drafts
               </div>
               {recentDraftSyncs.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Brak sync.{" "}
+                  No syncs.{" "}
                   <Link href="/database" className="text-primary hover:underline">
-                    Wczytaj ligi
+                    Load leagues
                   </Link>
                 </p>
               ) : (
@@ -199,7 +198,7 @@ export default async function Home() {
                       </Badge>
                       <span className="text-muted-foreground">
                         {s.lastFetched
-                          ? new Date(s.lastFetched).toLocaleString("pl-PL")
+                          ? new Date(s.lastFetched).toLocaleString("en-US")
                           : "—"}
                       </span>
                     </li>
@@ -210,16 +209,16 @@ export default async function Home() {
 
             <div>
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                Players (per liga)
+                Players (per league)
               </div>
               {recentLeaguePlayerSyncs.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Brak sync.{" "}
+                  No syncs.{" "}
                   <Link
                     href="/players-data/league"
                     className="text-primary hover:underline"
                   >
-                    Wybierz ligę
+                    Pick a league
                   </Link>
                 </p>
               ) : (
@@ -233,9 +232,9 @@ export default async function Home() {
                         {s.league}
                       </Badge>
                       <span className="text-muted-foreground">
-                        {s.count ?? 0} graczy ·{" "}
+                        {s.count ?? 0} players ·{" "}
                         {s.lastFetched
-                          ? new Date(s.lastFetched).toLocaleDateString("pl-PL")
+                          ? new Date(s.lastFetched).toLocaleDateString("en-US")
                           : "—"}
                       </span>
                     </li>
@@ -252,7 +251,7 @@ export default async function Home() {
           href="/scouting"
           className={buttonVariants({ variant: "outline", size: "sm" })}
         >
-          → Przejdź do listy graczy
+          → Go to player list
         </Link>
       </div>
     </div>

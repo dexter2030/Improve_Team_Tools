@@ -19,10 +19,10 @@ export function SyncBar({
     startTransition(async () => {
       const result = await syncPlayersAction();
       if (result.error) {
-        toast.error(`Błąd: ${result.error}`);
+        toast.error(`Error: ${result.error}`);
       } else {
         toast.success(
-          `Pobrano ${result.fetched}, zapisano ${result.saved} graczy.`
+          `Fetched ${result.fetched}, saved ${result.saved} players`
         );
       }
     });
@@ -31,29 +31,29 @@ export function SyncBar({
   return (
     <div className="flex items-center justify-between gap-4 p-4 rounded-lg border bg-muted/30">
       <div className="text-sm">
-        <div className="font-medium">Globalna baza graczy Leaguepedia</div>
+        <div className="font-medium">Global Leaguepedia player table</div>
         <div className="text-muted-foreground text-xs mt-0.5">
           {count > 0
-            ? `${count.toLocaleString("pl-PL")} graczy w bazie · ostatnie pobranie: ${
+            ? `${count.toLocaleString("en-US")} players in DB · last fetch: ${
                 lastFetched
-                  ? new Date(lastFetched).toLocaleString("pl-PL")
+                  ? new Date(lastFetched).toLocaleString("en-US")
                   : "—"
               }`
-            : "Brak danych — pobranie zajmuje ~1-2 minuty (~30k graczy)."}
+            : "No data — fetch takes ~1-2 minutes (~30k players)."}
         </div>
       </div>
       <Button onClick={sync} disabled={pending} variant={count > 0 ? "outline" : "default"}>
         {pending ? (
-          "Pobieram..."
+          "Loading..."
         ) : count > 0 ? (
           <>
             <RefreshCw className="h-4 w-4 mr-2" />
-            Odśwież
+            Refresh
           </>
         ) : (
           <>
             <Download className="h-4 w-4 mr-2" />
-            Pobierz
+            Fetch
           </>
         )}
       </Button>

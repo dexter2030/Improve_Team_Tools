@@ -15,16 +15,16 @@ export function ImportForm({ example }: { example: string }) {
 
   function submit() {
     if (!text.trim()) {
-      toast.error("Wklej dane do importu.");
+      toast.error("Paste data first");
       return;
     }
     startTransition(async () => {
       const r = await bulkImportAction(text);
       setResult(r);
       if (r.added > 0) {
-        toast.success(`Dodano ${r.added} z ${r.parsed} profili.`);
+        toast.success(`Added ${r.added} of ${r.parsed} profiles`);
       } else {
-        toast.error(`Nic nie dodano — sprawdź wyniki poniżej.`);
+        toast.error("Nothing added — check results below");
       }
     });
   }
@@ -33,7 +33,7 @@ export function ImportForm({ example }: { example: string }) {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Button onClick={submit} disabled={pending}>
-          {pending ? "Importuję..." : "Importuj"}
+          {pending ? "Importing..." : "Import"}
         </Button>
         <Button
           variant="outline"
@@ -41,11 +41,11 @@ export function ImportForm({ example }: { example: string }) {
           disabled={pending}
           size="sm"
         >
-          Wstaw przykład
+          Insert example
         </Button>
         {text && !pending && (
           <span className="text-xs text-muted-foreground">
-            {text.split(/\r?\n/).filter(Boolean).length - 1} wierszy danych
+            {text.split(/\r?\n/).filter(Boolean).length - 1} data rows
           </span>
         )}
       </div>
@@ -54,7 +54,7 @@ export function ImportForm({ example }: { example: string }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={12}
-        placeholder="Wklej tutaj CSV/TSV z headerem..."
+        placeholder="Paste CSV/TSV with header here..."
         className="font-mono text-xs"
         disabled={pending}
       />
@@ -63,15 +63,15 @@ export function ImportForm({ example }: { example: string }) {
         <div className="rounded-lg border bg-card p-4 space-y-3">
           <div className="flex items-center gap-4 text-sm">
             <span>
-              <Badge>{result.added} dodanych</Badge>
+              <Badge>{result.added} added</Badge>
             </span>
             {result.failed > 0 && (
               <span>
-                <Badge variant="destructive">{result.failed} błędów</Badge>
+                <Badge variant="destructive">{result.failed} errors</Badge>
               </span>
             )}
             <span className="text-muted-foreground">
-              z {result.parsed} sparsowanych wierszy
+              of {result.parsed} parsed rows
             </span>
           </div>
 
@@ -80,9 +80,9 @@ export function ImportForm({ example }: { example: string }) {
               <thead className="border-b bg-muted/40">
                 <tr className="text-left text-muted-foreground">
                   <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">Nazwa</th>
-                  <th className="px-3 py-2">Wynik</th>
-                  <th className="px-3 py-2">Szczegóły</th>
+                  <th className="px-3 py-2">Name</th>
+                  <th className="px-3 py-2">Result</th>
+                  <th className="px-3 py-2">Details</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,7 +107,7 @@ export function ImportForm({ example }: { example: string }) {
                       {r.ok ? (
                         <Badge>{r.resolutionState ?? "ok"}</Badge>
                       ) : (
-                        <Badge variant="destructive">błąd</Badge>
+                        <Badge variant="destructive">error</Badge>
                       )}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">

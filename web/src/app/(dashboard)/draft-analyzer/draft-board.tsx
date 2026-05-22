@@ -214,10 +214,10 @@ export function DraftBoard({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-sm text-muted-foreground">
-          Klik slot żeby otworzyć picker, klik sugestię żeby pickować bezpośrednio.
+          Click a slot to open the picker, click a suggestion to pick directly.
           {suggestions && suggestions.totalMatches > 0 && (
             <span className="ml-2 text-xs">
-              Sugestie z <strong>{suggestions.totalMatches}</strong> pasujących pro draftów.
+              Suggestions from <strong>{suggestions.totalMatches}</strong> matching pro drafts.
             </span>
           )}
         </div>
@@ -389,7 +389,7 @@ function Slot({
             ? "border-foreground/20 bg-background/60"
             : "border-foreground/15 hover:border-foreground/40 hover:bg-muted/40"
         }`}
-        title={value || "Kliknij żeby wybrać championa"}
+        title={value || "Click to pick a champion"}
       >
         {value && icon ? (
           <img
@@ -407,7 +407,7 @@ function Slot({
         <button
           onClick={onClear}
           className="text-muted-foreground hover:text-destructive p-0.5"
-          title="Wyczyść slot"
+          title="Clear slot"
         >
           <X className="h-3 w-3" />
         </button>

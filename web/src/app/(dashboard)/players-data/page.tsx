@@ -87,15 +87,15 @@ export default async function PlayersDataPage({ searchParams }: Props) {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Players Data</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Globalna baza graczy z Leaguepedia (~30k wpisów). Pobieranie zajmuje
-            chwilę — następne odświeżanie aktualizuje rostery po transferach.
+            Global Leaguepedia player table (~30k rows). First fetch takes a moment;
+            refresh updates rosters after transfers.
           </p>
         </div>
         <Link
           href="/players-data/league"
           className={buttonVariants({ variant: "outline" })}
         >
-          🏆 Tryb per liga →
+          🏆 Per-league mode →
         </Link>
       </div>
 
@@ -104,11 +104,10 @@ export default async function PlayersDataPage({ searchParams }: Props) {
       {total > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Filtry</CardTitle>
+            <CardTitle>Filters</CardTitle>
             <CardDescription>
-              {paginated.total.toLocaleString("pl-PL")} graczy spełnia filtry
-              (z {total.toLocaleString("pl-PL")} w bazie). Kliknij nagłówek
-              kolumny żeby posortować.
+              {paginated.total.toLocaleString("en-US")} players match filters
+              (of {total.toLocaleString("en-US")} in DB). Click a column header to sort.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -120,7 +119,7 @@ export default async function PlayersDataPage({ searchParams }: Props) {
       {total === 0 ? null : players.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Brak graczy spełniających filtry.
+            No players match the filters.
           </CardContent>
         </Card>
       ) : (
@@ -130,18 +129,18 @@ export default async function PlayersDataPage({ searchParams }: Props) {
               <TableHeader>
                 <TableRow>
                   <TableHead>
-                    <SortHeader column="id" label="Nick" />
+                    <SortHeader column="id" label="Name" />
                   </TableHead>
                   <TableHead>
-                    <SortHeader column="role" label="Rola" />
+                    <SortHeader column="role" label="Role" />
                   </TableHead>
                   <TableHead>
-                    <SortHeader column="team" label="Drużyna" />
+                    <SortHeader column="team" label="Team" />
                   </TableHead>
                   <TableHead>
-                    <SortHeader column="country" label="Kraj" />
+                    <SortHeader column="country" label="Country" />
                   </TableHead>
-                  <TableHead>Rezydencja</TableHead>
+                  <TableHead>Residency</TableHead>
                   <TableHead>
                     <SortHeader column="isRetired" label="Status" />
                   </TableHead>

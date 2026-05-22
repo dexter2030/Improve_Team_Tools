@@ -14,7 +14,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="pl">
+    <html lang="en">
       <body
         style={{
           fontFamily: "system-ui, sans-serif",
@@ -25,7 +25,7 @@ export default function GlobalError({
         }}
       >
         <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-          Improve Team Tools — błąd krytyczny
+          Improve Team Tools — fatal error
         </h1>
         <p style={{ marginTop: "1rem" }}>{error.message}</p>
         {error.digest && (
@@ -45,7 +45,7 @@ export default function GlobalError({
             cursor: "pointer",
           }}
         >
-          Spróbuj ponownie
+          Try again
         </button>
       </body>
     </html>

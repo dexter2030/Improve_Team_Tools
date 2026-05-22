@@ -19,7 +19,7 @@ export function LeagueSyncButton({
     startTransition(async () => {
       const r = await syncLeaguePlayersAction(league);
       if (r.error) toast.error(`${league}: ${r.error}`);
-      else toast.success(`${league}: ${r.saved} graczy zapisanych.`);
+      else toast.success(`${league}: ${r.saved} players saved`);
     });
   }
 
@@ -34,11 +34,11 @@ export function LeagueSyncButton({
         "..."
       ) : hasData ? (
         <>
-          <RefreshCw className="h-3.5 w-3.5 mr-1" /> Odśwież
+          <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
         </>
       ) : (
         <>
-          <Download className="h-3.5 w-3.5 mr-1" /> Wczytaj
+          <Download className="h-3.5 w-3.5 mr-1" /> Load
         </>
       )}
     </Button>

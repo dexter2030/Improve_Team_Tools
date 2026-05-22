@@ -36,7 +36,7 @@ export function PlayersFilters({
   return (
     <div className="grid gap-3 md:grid-cols-4">
       <Input
-        placeholder="Szukaj (nick, drużyna, wiki)..."
+        placeholder="Search (name, team, wiki)..."
         defaultValue={search}
         onChange={(e) => {
           const v = e.target.value;
@@ -51,10 +51,10 @@ export function PlayersFilters({
 
       <Select value={role} onValueChange={(v) => update("role", v)}>
         <SelectTrigger>
-          <SelectValue placeholder="Wszystkie role" />
+          <SelectValue placeholder="All roles" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ALL}>Wszystkie role</SelectItem>
+          <SelectItem value={ALL}>All roles</SelectItem>
           {roles.map((r) => (
             <SelectItem key={r} value={r}>
               {r}
@@ -65,10 +65,10 @@ export function PlayersFilters({
 
       <Select value={country} onValueChange={(v) => update("country", v)}>
         <SelectTrigger>
-          <SelectValue placeholder="Wszystkie kraje" />
+          <SelectValue placeholder="All countries" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ALL}>Wszystkie kraje</SelectItem>
+          <SelectItem value={ALL}>All countries</SelectItem>
           {countries.map((c) => (
             <SelectItem key={c} value={c}>
               {c}
@@ -85,7 +85,7 @@ export function PlayersFilters({
             update("hideRetired", e.target.checked ? "1" : null)
           }
         />
-        Ukryj retired
+        Hide retired
       </label>
     </div>
   );

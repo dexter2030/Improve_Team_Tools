@@ -37,7 +37,7 @@ export function Filters({ patches }: { patches: string[] }) {
     <div className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm font-medium">
-          Presety lig:
+          League presets:
           <Button size="xs" variant="outline" onClick={() => preset(LEAGUE_GROUPS.tier1)}>
             Tier 1
           </Button>
@@ -45,7 +45,7 @@ export function Filters({ patches }: { patches: string[] }) {
             + ERL D1
           </Button>
           <Button size="xs" variant="outline" onClick={clear}>
-            Wyczyść
+            Clear
           </Button>
         </div>
 
@@ -71,27 +71,27 @@ export function Filters({ patches }: { patches: string[] }) {
       {patches.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm font-medium flex-wrap">
-            Presety patchy:
+            Patch presets:
             <Button
               size="xs"
               variant="outline"
               onClick={() => update("patch", patches.slice(0, 5))}
             >
-              Ostatnie 5
+              Last 5
             </Button>
             <Button
               size="xs"
               variant="outline"
               onClick={() => update("patch", patches.slice(0, 10))}
             >
-              Ostatnie 10
+              Last 10
             </Button>
             <Button
               size="xs"
               variant="outline"
               onClick={() => update("patch", [])}
             >
-              Wszystkie patche
+              All patches
             </Button>
           </div>
 
