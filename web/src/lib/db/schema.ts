@@ -124,8 +124,15 @@ export const apiCache = pgTable(
 // --- drafts (pick & ban historical data) ------------------------------------
 
 /**
- * Jeden wiersz = jedna pro gra. Sekwencja draftu rozbita na 10 kolumn pick
- * (B1/R1/R2/B2/B3/R3/B4/B5/R4/R5 — convention Leaguepedia gdzie Team1=Blue).
+ * Jeden wiersz = jedna pro gra. Picki rozbite na 10 kolumn per strona
+ * (B1..B5 = Blue's N-th pick in their own pick order, R1..R5 = Red's).
+ * Convention Leaguepedia: Team1=Blue (zweryfikowane na sample 2024-2026).
+ *
+ * `firstPickSide` (od 2026) trzyma kto pickował pierwszy globally:
+ *   'blue'  — pattern: B1 R1 R2 B2 B3 R3 [bans2] R4 B4 B5 R5
+ *   'red'   — pattern: R1 B1 B2 R2 R3 B3 [bans2] B4 R4 R5 B5
+ *   null    — pre-2026 / brak danych z LP → traktujemy jako 'blue' (stara zasada).
+ *
  * Bany jako tablice tekstu (kolejność zachowana, ale przy match jako zbiór
  * per faza). winner = nazwa drużyny lub NULL (np. mecze toczące się).
  */
@@ -150,6 +157,7 @@ export const drafts = pgTable(
     b5Pick: text("b5_pick"),
     r4Pick: text("r4_pick"),
     r5Pick: text("r5_pick"),
+    firstPickSide: text("first_pick_side").$type<"blue" | "red" | null>(),
     winner: text("winner"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -160,6 +168,7 @@ export const drafts = pgTable(
     index("drafts_patch_idx").on(t.patch),
     index("drafts_b1_idx").on(t.b1Pick),
     index("drafts_game_date_idx").on(t.gameDate),
+    index("drafts_first_pick_side_idx").on(t.firstPickSide),
   ]
 );
 

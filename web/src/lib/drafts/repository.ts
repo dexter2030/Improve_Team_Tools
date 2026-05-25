@@ -88,6 +88,7 @@ export async function upsertDrafts(rows: RawDraft[]): Promise<number> {
           b5Pick: r.b5Pick,
           r4Pick: r.r4Pick,
           r5Pick: r.r5Pick,
+          firstPickSide: r.firstPickSide,
           winner: r.winner,
         }))
       )
@@ -111,6 +112,7 @@ export async function upsertDrafts(rows: RawDraft[]): Promise<number> {
           b5Pick: sql`excluded.b5_pick`,
           r4Pick: sql`excluded.r4_pick`,
           r5Pick: sql`excluded.r5_pick`,
+          firstPickSide: sql`excluded.first_pick_side`,
           winner: sql`excluded.winner`,
         },
       });

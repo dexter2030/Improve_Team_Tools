@@ -26,6 +26,7 @@ import {
   getAllDrafts,
 } from "@/lib/drafts/repository";
 import {
+  filterByFirstPickSide,
   filterByLeagues,
   filterByPatches,
   firstPickStats,
@@ -34,6 +35,7 @@ import {
   suggestAll,
   isPatternEmpty,
   type DraftPattern,
+  type FirstPickSide,
 } from "@/lib/drafts/analyzer";
 import { allChampionsMeta } from "@/lib/drafts/champion-icons";
 import { DraftBoard } from "./draft-board";
@@ -48,7 +50,10 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
   const sp = await searchParams;
   const leagues = (sp.league ?? "").split(",").filter(Boolean);
   const patches = (sp.patch ?? "").split(",").filter(Boolean);
-  const pattern = parsePattern(sp);
+  const fpsParam = (sp.fps ?? "").trim();
+  const firstPickSide: FirstPickSide | null =
+    fpsParam === "blue" || fpsParam === "red" ? fpsParam : null;
+  const pattern = parsePattern(sp, firstPickSide ?? undefined);
 
   const [total, allPatches, all, champions] = await Promise.all([
     countAllDrafts(),
@@ -60,11 +65,12 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
   const iconByName: Record<string, string> = {};
   for (const c of champions) iconByName[c.name] = c.iconUrl;
 
-  // Apply filters lig/patchy najpierw — pozostałe operacje (suggestions,
+  // Apply filters lig/patchy/firstPick najpierw — pozostałe operacje (suggestions,
   // matches, top stats) liczymy na tym zbiorze.
   let filtered = all;
   if (leagues.length > 0) filtered = filterByLeagues(filtered, leagues);
   if (patches.length > 0) filtered = filterByPatches(filtered, patches);
+  if (firstPickSide) filtered = filterByFirstPickSide(filtered, firstPickSide);
 
   // Suggestions na filtrowanych draftach — zmiana ligi/patcha zmienia
   // top championów per slot natychmiast.
@@ -102,7 +108,15 @@ export default async function DraftAnalyzerPage({ searchParams }: Props) {
             <CardDescription>
               {filtered.length === total
                 ? `All ${total} drafts in DB.`
-                : `${filtered.length} of ${total} drafts match league/patch filters.`}
+                : `${filtered.length} of ${total} drafts match active filters.`}
+              {firstPickSide && (
+                <span className="ml-2 text-xs">
+                  First pick:{" "}
+                  <strong className={firstPickSide === "blue" ? "text-blue-600" : "text-rose-600"}>
+                    {firstPickSide === "blue" ? "Blue" : "Red"}
+                  </strong>
+                </span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -214,7 +228,10 @@ async function safeGetDrafts() {
   }
 }
 
-function parsePattern(sp: Record<string, string | undefined>): DraftPattern {
+function parsePattern(
+  sp: Record<string, string | undefined>,
+  firstPickSide?: FirstPickSide
+): DraftPattern {
   const get = (k: string): string | null => (sp[k] || "").trim() || null;
   const list = (k: string): string[] =>
     (sp[k] || "")
@@ -226,6 +243,7 @@ function parsePattern(sp: Record<string, string | undefined>): DraftPattern {
     redPicks: ["r1", "r2", "r3", "r4", "r5"].map(get),
     phase1Bans: list("phase1Bans"),
     phase2Bans: list("phase2Bans"),
+    firstPickSide,
   };
 }
 

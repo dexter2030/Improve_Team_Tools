@@ -19,6 +19,8 @@ export function Filters({ patches }: { patches: string[] }) {
   );
   const [showAllPatches, setShowAllPatches] = useState(hasHiddenActive);
 
+  const activeFps = (sp.get("fps") ?? "").trim(); // "", "blue", "red"
+
   function update(key: string, values: string[]) {
     const next = new URLSearchParams(sp.toString());
     if (values.length === 0) next.delete(key);
@@ -32,6 +34,13 @@ export function Filters({ patches }: { patches: string[] }) {
       ? current.filter((v) => v !== value)
       : [...current, value];
     update(key, next);
+  }
+
+  function setFps(value: "" | "blue" | "red") {
+    const next = new URLSearchParams(sp.toString());
+    if (value) next.set("fps", value);
+    else next.delete("fps");
+    router.push(`/draft-analyzer?${next.toString()}`);
   }
 
   function clear() {
@@ -81,6 +90,44 @@ export function Filters({ patches }: { patches: string[] }) {
               </button>
             )
           )}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-sm font-medium flex-wrap">
+          First pick:
+          <button
+            onClick={() => setFps("")}
+            className={`text-xs px-2 py-1 rounded border transition-colors ${
+              !activeFps
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border hover:bg-muted"
+            }`}
+          >
+            Any
+          </button>
+          <button
+            onClick={() => setFps("blue")}
+            className={`text-xs px-2 py-1 rounded border transition-colors ${
+              activeFps === "blue"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "border-border hover:bg-muted"
+            }`}
+            title="Blue side picks first (stara zasada + 2026 gdy Blue wybrał first-pick). Legacy bez FP traktowany jako Blue."
+          >
+            Blue first
+          </button>
+          <button
+            onClick={() => setFps("red")}
+            className={`text-xs px-2 py-1 rounded border transition-colors ${
+              activeFps === "red"
+                ? "bg-rose-600 text-white border-rose-600"
+                : "border-border hover:bg-muted"
+            }`}
+            title="Red side picks first (od 2026, tylko drafty z explicit FP=red)"
+          >
+            Red first
+          </button>
         </div>
       </div>
 

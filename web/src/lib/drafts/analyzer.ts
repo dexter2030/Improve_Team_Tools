@@ -1,34 +1,68 @@
 /**
  * Draft Analyzer — czyste transformacje, bez IO.
  *
- * Picki w prawdziwym drafcie są częściowo pickowane jednocześnie:
- *   - B2/B3 → para (cały blue P2/P3 idzie naraz)
- *   - B4/B5 → para
- *   - R1/R2 → para
- *   - R4/R5 → para
- *   - B1, R3 → standalone
- * Czyli przy wyszukiwaniu kolejność w parze NIE MA znaczenia — jeśli user
- * wpisze R1=Azir i R2=Caitlyn, dopasujemy też drafty gdzie r1Pick=Caitlyn
- * i r2Pick=Azir. Bany — zawsze pula faz.
+ * Kolejność pickow w drafcie LoL zależy od kto picka pierwszy (FP).
+ * W starym formacie zawsze Blue, od 2026 Blue lub Red niezależnie od strony.
+ *
+ * Blue first:
+ *   Phase 1: B1, R1, R2, B2, B3, R3
+ *   Phase 2: R4, B4, B5, R5
+ *   Pary (pickowane jednocześnie): B2+B3, B4+B5, R1+R2
+ *   Standalone: B1, R3, R4, R5
+ *
+ * Red first (mirror):
+ *   Phase 1: R1, B1, B2, R2, R3, B3
+ *   Phase 2: B4, R4, R5, B5
+ *   Pary: R2+R3, R4+R5, B1+B2
+ *   Standalone: R1, B3, B4, B5
+ *
+ * Bany — zawsze pula faz, niezależnie od FP.
  */
 
 import type { Draft } from "@/lib/db/schema";
 import { moreSpecific } from "@/lib/leaguepedia/leagues";
+
+export type FirstPickSide = "blue" | "red";
 
 export const PICK_KEYS = [
   "b1Pick", "r1Pick", "r2Pick", "b2Pick", "b3Pick",
   "r3Pick", "b4Pick", "b5Pick", "r4Pick", "r5Pick",
 ] as const;
 
-/** Indeksy pozycji które są pickowane jednocześnie (po stronie blue/red). */
-const BLUE_PAIRS: ReadonlyArray<readonly [number, number]> = [
-  [1, 2], // B2 + B3
-  [3, 4], // B4 + B5
-];
-const RED_PAIRS: ReadonlyArray<readonly [number, number]> = [
-  [0, 1], // R1 + R2
-  [3, 4], // R4 + R5
-];
+/**
+ * Indeksy pozycji pickowanych jednocześnie, per first-pick scenario.
+ * Mirror: red-first ma pary R2+R3 zamiast B2+B3 (faza 1) i B1+B2 zamiast R1+R2.
+ */
+const PAIRS_BY_FP: Record<
+  FirstPickSide,
+  { blue: ReadonlyArray<readonly [number, number]>; red: ReadonlyArray<readonly [number, number]> }
+> = {
+  blue: {
+    blue: [
+      [1, 2], // B2 + B3 (phase 1 double)
+      [3, 4], // B4 + B5 (phase 2 double)
+    ],
+    red: [
+      [0, 1], // R1 + R2 (phase 1 double)
+    ],
+  },
+  red: {
+    blue: [
+      [0, 1], // B1 + B2 (phase 1 double — Blue is second-pick team)
+    ],
+    red: [
+      [1, 2], // R2 + R3 (phase 1 double)
+      [3, 4], // R4 + R5 (phase 2 double)
+    ],
+  },
+};
+
+function getPairs(
+  side: "blue" | "red",
+  firstPickSide: FirstPickSide | undefined
+): ReadonlyArray<readonly [number, number]> {
+  return PAIRS_BY_FP[firstPickSide ?? "blue"][side];
+}
 
 /** Lookup: indeks → indeks pary (lub null jeśli standalone). */
 function pairFor(
@@ -51,6 +85,11 @@ export interface DraftPattern {
   phase1Bans: string[];
   /** Bany fazy 2 (4-5). */
   phase2Bans: string[];
+  /**
+   * Kto picka pierwszy. Wpływa na pair logic (które pozycje są pickowane
+   * jednocześnie). undefined = nie wybrano, używamy domyślnie blue-first.
+   */
+  firstPickSide?: FirstPickSide;
 }
 
 export function isPatternEmpty(p: DraftPattern): boolean {
@@ -88,14 +127,16 @@ function pairMatches(
 export function searchDrafts(drafts: Draft[], p: DraftPattern): Draft[] {
   if (isPatternEmpty(p)) return [];
 
+  const bluePairs = getPairs("blue", p.firstPickSide);
+  const redPairs = getPairs("red", p.firstPickSide);
+
   return drafts.filter((d) => {
     // Blue picks — z uwzględnieniem par.
     const blueChecked = new Set<number>();
     for (let i = 0; i < 5; i++) {
       if (blueChecked.has(i)) continue;
-      const partner = pairFor(i, BLUE_PAIRS);
+      const partner = pairFor(i, bluePairs);
       if (partner === null) {
-        // Standalone (B1)
         const wanted = p.bluePicks[i];
         if (wanted && bluePickAt(d, i) !== wanted) return false;
         blueChecked.add(i);
@@ -117,7 +158,7 @@ export function searchDrafts(drafts: Draft[], p: DraftPattern): Draft[] {
     const redChecked = new Set<number>();
     for (let i = 0; i < 5; i++) {
       if (redChecked.has(i)) continue;
-      const partner = pairFor(i, RED_PAIRS);
+      const partner = pairFor(i, redPairs);
       if (partner === null) {
         const wanted = p.redPicks[i];
         if (wanted && redPickAt(d, i) !== wanted) return false;
@@ -183,18 +224,20 @@ export function suggestAll(
   const matches = searchDrafts(drafts, pattern);
   if (matches.length === 0) return { totalMatches: 0, groups: {} };
 
+  const bluePairs = getPairs("blue", pattern.firstPickSide);
+  const redPairs = getPairs("red", pattern.firstPickSide);
+
   const groups: Record<string, SuggestionEntry[]> = {};
 
   // Blue picks per pozycja — z uwzględnieniem par.
   for (let i = 0; i < 5; i++) {
     if (pattern.bluePicks[i]) continue; // już wypełniony, brak sugestii
-    const partner = pairFor(i, BLUE_PAIRS);
+    const partner = pairFor(i, bluePairs);
     const used = new Set(pattern.bluePicks.filter(Boolean) as string[]);
     let pool: (string | null)[];
     if (partner === null) {
       pool = matches.map((d) => bluePickAt(d, i));
     } else {
-      // Pool z obu pozycji w parze
       pool = matches.flatMap((d) => [
         bluePickAt(d, i),
         bluePickAt(d, partner),
@@ -206,7 +249,7 @@ export function suggestAll(
   // Red picks — analogicznie.
   for (let i = 0; i < 5; i++) {
     if (pattern.redPicks[i]) continue;
-    const partner = pairFor(i, RED_PAIRS);
+    const partner = pairFor(i, redPairs);
     const used = new Set(pattern.redPicks.filter(Boolean) as string[]);
     let pool: (string | null)[];
     if (partner === null) {
@@ -275,6 +318,22 @@ export function filterByPatches(
   if (allowedPatches.length === 0) return drafts;
   const set = new Set(allowedPatches);
   return drafts.filter((d) => d.patch && set.has(d.patch));
+}
+
+/**
+ * Filtr po first-pick side. null = bez filtra (wszystkie). 'blue' łapie też
+ * drafty bez firstPickSide (legacy = traktujemy jak blue-first per starej zasadzie).
+ * 'red' łapie tylko drafty z explicitym firstPickSide='red'.
+ */
+export function filterByFirstPickSide(
+  drafts: Draft[],
+  side: FirstPickSide | null
+): Draft[] {
+  if (!side) return drafts;
+  if (side === "blue") {
+    return drafts.filter((d) => d.firstPickSide === "blue" || d.firstPickSide === null);
+  }
+  return drafts.filter((d) => d.firstPickSide === "red");
 }
 
 /** Filtr po lidze — substring match, wykluczając moreSpecific(). */
