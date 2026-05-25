@@ -1,11 +1,14 @@
 /**
- * Cargo extension — pobieranie draftów (PicksAndBansS7 + ScoreboardGames).
+ * Cargo extension — pobieranie draftów (PicksAndBansS7 + ScoreboardGames
+ * + MatchScheduleGame).
  *
- * Klucz mapowania: PicksAndBansS7.GameId NIE łączy się bezpośrednio ze
- * ScoreboardGames — most jest przez MatchScheduleGame.OverviewPage (lub
- * tutaj prościej: po GameId które dzielą obie tabele dla ostatnich
- * sezonów). Dla MVP używamy bezpośredniego joina ScoreboardGames.GameId
- * = PicksAndBansS7.GameId — to działa od S7.
+ * Join: PicksAndBansS7.GameId = ScoreboardGames.GameId
+ *     + ScoreboardGames.GameId = MatchScheduleGame.GameId.
+ *
+ * Z MatchScheduleGame bierzemy `Blue`, `Red`, `FirstPick` żeby obliczyć
+ * `firstPickSide` — od 2026 LEC/LCK strony i first-pick mogą być różne
+ * drużynami. Pre-2026 `FirstPick` jest puste w LP → zostawiamy null
+ * (analyzer traktuje to jak 'blue', bo stara zasada Blue=first).
  */
 
 import { cargoQuery, cargoEscape, cargoPaginated, toStr, type CargoRow } from "./cargo";
@@ -30,6 +33,7 @@ export interface RawDraft {
   b5Pick: string | null;
   r4Pick: string | null;
   r5Pick: string | null;
+  firstPickSide: "blue" | "red" | null;
   winner: string | null;
 }
 
@@ -62,7 +66,13 @@ const PICK_BAN_FIELDS = [
   "ScoreboardGames.Team1=Team1",
   "ScoreboardGames.Team2=Team2",
   "ScoreboardGames.Winner=Winner",
+  "MatchScheduleGame.Blue=MsgBlue",
+  "MatchScheduleGame.Red=MsgRed",
+  "MatchScheduleGame.FirstPick=MsgFirstPick",
 ].join(",");
+
+const DRAFTS_JOIN_ON =
+  "PicksAndBansS7.GameId=ScoreboardGames.GameId,ScoreboardGames.GameId=MatchScheduleGame.GameId";
 
 /**
  * Iteruje porcje draftów dla danej ligi. Filtr po Tournament LIKE '%league%'
@@ -90,10 +100,10 @@ export async function fetchDrafts(
 
   const rows = await cargoPaginated(
     {
-      tables: "PicksAndBansS7,ScoreboardGames",
+      tables: "PicksAndBansS7,ScoreboardGames,MatchScheduleGame",
       fields: PICK_BAN_FIELDS,
       where: whereParts.join(" AND "),
-      joinOn: "PicksAndBansS7.GameId=ScoreboardGames.GameId",
+      joinOn: DRAFTS_JOIN_ON,
       orderBy: "ScoreboardGames.DateTime_UTC DESC",
     },
     maxRows
@@ -123,6 +133,8 @@ export async function countDrafts(league: string): Promise<number> {
     groupBy: "PicksAndBansS7.GameId",
     limit: 1,
   });
+  // countDrafts używamy tylko jako wskaźnik kompletności w UI — join do
+  // MatchScheduleGame nie jest tu potrzebny.
   // Cargo z group by zwraca jeden wiersz per GameId; lepiej policzyć length.
   // Dla dokładnego countu zrób oddzielne paginated query.
   return rows.length;
@@ -145,13 +157,28 @@ function normalize(row: CargoRow): RawDraft {
   // Konwersja Leaguepedia (Team1=Blue, Team2=Red) na nasze nazwy:
   // B1=t1p1, R1=t2p1, R2=t2p2, B2=t1p2, B3=t1p3, R3=t2p3,
   // B4=t1p4, B5=t1p5, R4=t2p4, R5=t2p5
+  const blueTeam = toStr(row.Team1) || null;
+  const redTeam = toStr(row.Team2) || null;
+
+  // firstPickSide — porównanie MatchScheduleGame.FirstPick z Blue/Red nazwą.
+  // Pre-2026 LP zwraca puste FirstPick → null (analyzer traktuje jako 'blue').
+  const msgBlue = toStr(row.MsgBlue);
+  const msgRed = toStr(row.MsgRed);
+  const msgFirstPick = toStr(row.MsgFirstPick);
+  let firstPickSide: "blue" | "red" | null = null;
+  if (msgFirstPick) {
+    if (msgFirstPick === msgBlue) firstPickSide = "blue";
+    else if (msgFirstPick === msgRed) firstPickSide = "red";
+    // Inny przypadek (rebrand drużyny między MSG a ScoreboardGames?) — null.
+  }
+
   return {
     matchId: gameId,
     patch: toStr(row.Patch) || null,
     league: toStr(row.Tournament),
     gameDate: parseUtc(row.DateTime),
-    blueTeam: toStr(row.Team1) || null,
-    redTeam: toStr(row.Team2) || null,
+    blueTeam,
+    redTeam,
     blueBans: bans(1),
     redBans: bans(2),
     b1Pick: pick("t1p1"),
@@ -164,6 +191,7 @@ function normalize(row: CargoRow): RawDraft {
     b5Pick: pick("t1p5"),
     r4Pick: pick("t2p4"),
     r5Pick: pick("t2p5"),
+    firstPickSide,
     winner: toStr(row.Winner) || null,
   };
 }

@@ -36,6 +36,13 @@
       "when": 1779470944762,
       "tag": "0004_hard_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779745472900,
+      "tag": "0005_first_pick_side",
+      "breakpoints": true
     }
   ]
 }
