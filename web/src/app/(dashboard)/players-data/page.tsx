@@ -35,6 +35,7 @@ export const dynamic = "force-dynamic";
 interface Props {
   searchParams: Promise<{
     role?: string;
+    playerRolesOnly?: string;
     country?: string;
     search?: string;
     hideRetired?: string;
@@ -46,6 +47,7 @@ interface Props {
 export default async function PlayersDataPage({ searchParams }: Props) {
   const sp = await searchParams;
   const role = sp.role || undefined;
+  const playerRolesOnly = sp.playerRolesOnly === "1";
   const country = sp.country || undefined;
   const search = sp.search || undefined;
   const hideRetired = sp.hideRetired === "1";
@@ -70,6 +72,7 @@ export default async function PlayersDataPage({ searchParams }: Props) {
     total > 0
       ? await listPlayersPaginated({
           role,
+          playerRolesOnly,
           country,
           search,
           hideRetired,
@@ -154,8 +157,18 @@ export default async function PlayersDataPage({ searchParams }: Props) {
                   const leaguepediaUrl = `https://lol.fandom.com/wiki/${encodeURIComponent(
                     p.overviewPage.replace(/ /g, "_")
                   )}`;
+                  // Cargo's Players.Lolpros field is already a full URL
+                  // (e.g. https://lolpros.gg/player/curator), not a slug —
+                  // don't prefix it. Slug-only fallback kept defensively.
                   const lolprosUrl = p.lolpros
-                    ? `https://lolpros.gg/player/${p.lolpros}`
+                    ? p.lolpros.startsWith("http")
+                      ? p.lolpros
+                      : `https://lolpros.gg/player/${p.lolpros}`
+                    : null;
+                  const lolprosLabel = p.lolpros
+                    ? p.lolpros
+                        .replace(/^https?:\/\/lolpros\.gg\/player\//, "")
+                        .replace(/\/$/, "")
                     : null;
                   const scoutingRoles = ["Top", "Jungle", "Mid", "Bot", "Support"];
                   const canScout = !!p.role && scoutingRoles.includes(p.role);
@@ -199,7 +212,7 @@ export default async function PlayersDataPage({ searchParams }: Props) {
                             rel="noreferrer"
                             className="text-primary hover:underline text-xs"
                           >
-                            {p.lolpros} ↗
+                            {lolprosLabel} ↗
                           </a>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>

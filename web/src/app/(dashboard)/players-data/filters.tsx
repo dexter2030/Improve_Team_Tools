@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 
 const ALL = "__all__";
+const PLAYERS_ONLY = "__players__";
 
 export function PlayersFilters({
   roles,
@@ -21,7 +22,10 @@ export function PlayersFilters({
 }) {
   const router = useRouter();
   const sp = useSearchParams();
-  const role = sp.get("role") ?? ALL;
+  // Select shows either a concrete role, the players-only sentinel, or ALL.
+  // URL stores either `role=<concrete>` or `playerRolesOnly=1` — never both.
+  const playersOnly = sp.get("playerRolesOnly") === "1";
+  const role = playersOnly ? PLAYERS_ONLY : (sp.get("role") ?? ALL);
   const country = sp.get("country") ?? ALL;
   const search = sp.get("search") ?? "";
   const hideRetired = sp.get("hideRetired") === "1";
@@ -30,6 +34,19 @@ export function PlayersFilters({
     const next = new URLSearchParams(sp.toString());
     if (!value || value === ALL) next.delete(key);
     else next.set(key, value);
+    router.push(`/players-data?${next.toString()}`);
+  }
+
+  function updateRole(value: string | null) {
+    const next = new URLSearchParams(sp.toString());
+    if (value === PLAYERS_ONLY) {
+      next.delete("role");
+      next.set("playerRolesOnly", "1");
+    } else {
+      next.delete("playerRolesOnly");
+      if (!value || value === ALL) next.delete("role");
+      else next.set("role", value);
+    }
     router.push(`/players-data?${next.toString()}`);
   }
 
@@ -49,12 +66,21 @@ export function PlayersFilters({
         }}
       />
 
-      <Select value={role} onValueChange={(v) => update("role", v)}>
+      <Select value={role} onValueChange={updateRole}>
         <SelectTrigger>
-          <SelectValue placeholder="All roles" />
+          <SelectValue placeholder="All roles">
+            {(v) =>
+              v === ALL
+                ? "All roles"
+                : v === PLAYERS_ONLY
+                  ? "Players only"
+                  : v
+            }
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>All roles</SelectItem>
+          <SelectItem value={PLAYERS_ONLY}>Players only (Top/Jungle/Mid/Bot/Support)</SelectItem>
           {roles.map((r) => (
             <SelectItem key={r} value={r}>
               {r}
@@ -65,7 +91,9 @@ export function PlayersFilters({
 
       <Select value={country} onValueChange={(v) => update("country", v)}>
         <SelectTrigger>
-          <SelectValue placeholder="All countries" />
+          <SelectValue placeholder="All countries">
+            {(v) => (v === ALL ? "All countries" : v)}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>All countries</SelectItem>
