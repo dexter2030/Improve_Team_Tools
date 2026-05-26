@@ -20,7 +20,7 @@ from .analyzer import (
     search_drafts, suggest_all,
 )
 from .champion_icons import icon_url
-from .db import init_db, fetch_all_drafts, list_patches
+from .db import clear_drafts_caches, fetch_all_drafts, init_db, list_patches
 from .leagues import PRESETS, DEFAULT_PRESET, all_known_leagues
 from .sync import fetch_league
 
@@ -143,17 +143,29 @@ def render():
     _render_stats_section(filtered_drafts)
 
     # ================= SEKCJA 4: cała baza =================
+    # Render za checkboxem — pełna baza to setki/tysiące wierszy i pełny
+    # SELECT + budowa DataFrame'u. Renderowane domyślnie wymuszało ten koszt
+    # na każdym rerunie (klik w patch też rerunuje całą stronę), nawet gdy
+    # użytkownik patrzył tylko na wyszukiwarkę. Stan checkboxa żyje w
+    # session_state — raz włączone zostaje, dopóki user nie wyłączy.
     st.divider()
     st.subheader("3 · Full draft database")
-    all_drafts = fetch_all_drafts()
-    if not all_drafts:
-        st.info("DB is empty — fetch data from Leaguepedia above.")
-    else:
-        st.caption(
-            f"{len(all_drafts)} drafts in DB · columns in draft order "
-            f"(T1 = blue side, T2 = red side)."
-        )
-        _drafts_wide_table(all_drafts)
+    show_all = st.checkbox(
+        "Show full draft database",
+        value=False,
+        key="da_show_all_drafts",
+        help="Loading the whole DB is slow for large datasets — click to expand.",
+    )
+    if show_all:
+        all_drafts = fetch_all_drafts()
+        if not all_drafts:
+            st.info("DB is empty — fetch data from Leaguepedia above.")
+        else:
+            st.caption(
+                f"{len(all_drafts)} drafts in DB · columns in draft order "
+                f"(T1 = blue side, T2 = red side)."
+            )
+            _drafts_wide_table(all_drafts)
 
 
 # --- helpery UI --------------------------------------------------------------
@@ -181,6 +193,10 @@ def _run_fetch(leagues: list[str], season: str, full_refresh: bool) -> None:
                          full_refresh=full_refresh, on_batch=on_batch)
         )
     bar.progress(1.0, text="Done.")
+
+    # Wpadły nowe drafty (lub byłe upserty zmieniły patche/teams) — cache
+    # SELECT-ów dla wyszukiwarki i list filtrów jest nieaktualny.
+    clear_drafts_caches()
 
     saved = sum(o.saved for o in outcomes)
     errors = [o for o in outcomes if o.error]

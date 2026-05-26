@@ -18,6 +18,7 @@ import streamlit as st
 
 from .db import (
     all_league_sync,
+    clear_drafts_caches,
     count_all_drafts,
     count_drafts_for_league,
     init_db,
@@ -142,6 +143,10 @@ def _fetch_and_report(leagues: list[str], full_refresh: bool) -> None:
             fetch_league(lg, full_refresh=full_refresh, on_batch=on_batch)
         )
     bar.progress(1.0, text="Done.")
+
+    # Świeże drafty + zaktualizowane liczniki league_sync — unieważniamy
+    # cache odczytów, żeby render po st.rerun() pokazał aktualne dane.
+    clear_drafts_caches()
 
     st.session_state["db_msg"] = _summary(outcomes)
     st.rerun()

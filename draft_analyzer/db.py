@@ -13,9 +13,18 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
+import streamlit as st
+
 from .leagues import more_specific
 
 DB_PATH = Path(__file__).parent / "drafts.db"
+
+# TTL dla cache'u odczytów (sekundy). Streamlit rerunuje stronę przy każdej
+# interakcji widżetu (klik w patch multiselect, zmiana checkboxa, ...), a
+# bez cache te same SELECT-y wykonywałyby się 2-3x na render. Pięć minut
+# to kompromis: ręczny refresh i tak unieważnia cache (clear_drafts_caches),
+# więc nieaktualność może wystąpić tylko po edycji bazy spoza UI.
+_READ_TTL = 300
 
 
 @contextmanager
@@ -292,10 +301,16 @@ def upsert_draft(d: dict):
         )
 
 
+@st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def fetch_all_drafts(patches: list[str] | None = None) -> list[dict]:
     """
     Zwraca wszystkie drafty (opcjonalnie zawężone do listy patchy).
     Bany deserializowane z JSON do list pythonowych.
+
+    Cache: Streamlit hashuje argumenty (None lub listę patchy), więc
+    powtórne wywołanie tym samym zestawem patchy trafia w cache zamiast
+    ponownie skanować tabelę i parsować JSON. Unieważnia clear_drafts_caches()
+    po fetchu nowych draftów.
     """
     query = "SELECT * FROM drafts"
     params: list = []
@@ -316,6 +331,7 @@ def fetch_all_drafts(patches: list[str] | None = None) -> list[dict]:
     return out
 
 
+@st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def list_patches() -> list[str]:
     """Lista dostępnych patchy, od najnowszego."""
     with get_conn() as conn:
@@ -326,6 +342,7 @@ def list_patches() -> list[str]:
     return [r["patch"] for r in rows]
 
 
+@st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def list_teams() -> list[str]:
     """Lista drużyn występujących po stronie blue, alfabetycznie."""
     with get_conn() as conn:
@@ -337,12 +354,14 @@ def list_teams() -> list[str]:
     return [r["blue_team"] for r in rows]
 
 
+@st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def count_all_drafts() -> int:
     """Łączna liczba draftów w bazie."""
     with get_conn() as conn:
         return conn.execute("SELECT COUNT(*) AS n FROM drafts").fetchone()["n"]
 
 
+@st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def count_drafts_for_league(league: str) -> int:
     """Liczba draftów w lokalnej bazie pasujących do nazwy ligi.
 
@@ -374,11 +393,27 @@ def get_league_sync(league: str) -> dict | None:
     return dict(row) if row else None
 
 
+@st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def all_league_sync() -> dict[str, dict]:
     """Cała tabela league_sync jako mapa: krótka nazwa ligi -> wiersz."""
     with get_conn() as conn:
         rows = conn.execute("SELECT * FROM league_sync").fetchall()
     return {r["league"]: dict(r) for r in rows}
+
+
+def clear_drafts_caches() -> None:
+    """Unieważnia cache wszystkich odczytów dotyczących draftów.
+
+    Wołać po każdym fetch_league() / batchu upsert_draft() z UI, żeby
+    następny render widział świeże dane. Czyści po jednej funkcji zamiast
+    `st.cache_data.clear()`, żeby nie wywalać cache'ów spoza modułu drafts.
+    """
+    fetch_all_drafts.clear()
+    list_patches.clear()
+    list_teams.clear()
+    count_all_drafts.clear()
+    count_drafts_for_league.clear()
+    all_league_sync.clear()
 
 
 def mark_league_fetched(league: str, last_game_date: str | None) -> None:
