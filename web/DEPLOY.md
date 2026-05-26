@@ -101,6 +101,18 @@ Cron `0 3 * * *` UTC (4:00 / 5:00 CET zima/lato) leci codziennie i
 wrzuca pełen dump bazy jako JSON do shared folderu Drive. Konfiguracja
 w `web/vercel.json`, handler w `web/src/app/api/cron/backup/route.ts`.
 
+### TODO — manual setup (jednorazowo, do zrobienia ręcznie)
+
+Kod gotowy, ale dopóki nie wykonasz poniższych kroków, cron będzie
+zwracać 500 (brak ENV). Wymagają Twojego konta Google + Vercel, więc
+muszą być zrobione ręcznie:
+
+- [ ] §7.1 — Service Account w GCP + pobranie JSON keya
+- [ ] §7.2 — Folder na Drive + share z emailem SA jako Editor
+- [ ] §7.3 — `GOOGLE_SERVICE_ACCOUNT_KEY` + `BACKUP_DRIVE_FOLDER_ID` w Vercel ENV
+- [ ] §7.5 — Test ręczny przez curl, sprawdzenie pliku w folderze
+- [ ] Po pierwszym udanym cronie (3:00 UTC dnia po deploy) — odznaczyć tutaj
+
 ### 7.1. Service Account
 
 1. https://console.cloud.google.com → **APIs & Services → Library** →
