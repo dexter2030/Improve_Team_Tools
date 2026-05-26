@@ -39,6 +39,12 @@ LEAGUEPEDIA_PASSWORD=...
 # Bramka loginowa
 APP_PASSWORD=mocne-haslo-do-strony
 AUTH_SECRET=losowy-string-min-32-znaki-tylko-dla-produkcji
+
+# Backup do Drive (sekcja 7). Vercel ustawia CRON_SECRET sam — nie wpisuj.
+GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n..."}
+BACKUP_DRIVE_FOLDER_ID=1AbCdEf...
+# Opcjonalnie — domyślnie 30 dni retencji.
+# BACKUP_RETENTION_DAYS=30
 ```
 
 **Ważne:**
@@ -89,16 +95,62 @@ git push
 Drizzle migrate odpalasz lokalnie z `.env.local`, który wskazuje na tę
 samą Supabase (jeden projekt = jedna baza między dev i prod).
 
-## TODO: Backup do Google Drive
+## 7. Backup do Google Drive
 
-Plan na osobny PR:
-1. Service Account w Google Cloud + JSON key.
-2. Folder Drive shared z `<sa>@<project>.iam.gserviceaccount.com`.
-3. Vercel Cron Job (`app/api/cron/backup/route.ts`) co 24h:
-   - Eksportuje `scouting_profiles`, `drafts`, `lp_players_all` jako JSON.
-   - Upload do Drive przez `googleapis` package.
-4. ENV: `GOOGLE_SERVICE_ACCOUNT_KEY` (cały JSON jako string),
-   `BACKUP_DRIVE_FOLDER_ID`.
+Cron `0 3 * * *` UTC (4:00 / 5:00 CET zima/lato) leci codziennie i
+wrzuca pełen dump bazy jako JSON do shared folderu Drive. Konfiguracja
+w `web/vercel.json`, handler w `web/src/app/api/cron/backup/route.ts`.
 
-Bez backup'a obecnie: dane żyją wyłącznie w Supabase. Free tier ma
-codzienne backupy ale tylko 7 dni retention.
+### 7.1. Service Account
+
+1. https://console.cloud.google.com → **APIs & Services → Library** →
+   włącz **Google Drive API**.
+2. **IAM & Admin → Service Accounts → Create Service Account**.
+   Nazwij np. `itt-backup`. Role może być pusta — uprawnienia daje
+   share na folderze (poniżej).
+3. W liście SA klik na utworzone konto → **Keys → Add Key → JSON**.
+   Pobiera się plik JSON — to całe ENV `GOOGLE_SERVICE_ACCOUNT_KEY`.
+
+### 7.2. Folder Drive
+
+1. https://drive.google.com → New → Folder, np. "Improve Team Tools backups".
+2. Right-click → **Share** → wpisz email SA z JSON-a
+   (`<nazwa>@<project>.iam.gserviceaccount.com`), nadaj **Editor**.
+3. W URL folderu (`https://drive.google.com/drive/folders/XYZ`) skopiuj
+   `XYZ` — to `BACKUP_DRIVE_FOLDER_ID`.
+
+### 7.3. Vercel ENV
+
+W Project Settings → Environment Variables dodaj:
+
+```env
+GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account",...}   # cały JSON jednym stringiem
+BACKUP_DRIVE_FOLDER_ID=XYZ
+# Opcjonalnie:
+# BACKUP_RETENTION_DAYS=30
+```
+
+`CRON_SECRET` ustawia się **automatycznie** przy włączeniu cron jobs —
+nie wpisuj ręcznie.
+
+### 7.4. Co jest w backupie
+
+Plik `improve-team-tools-backup-<ISO-timestamp>.json` zawiera wszystkie
+tabele user-authored + Leaguepedia data (`scouting_profiles`,
+`soloq_accounts`, `proplay_identities`, `drafts`, `lp_players_all`,
+`lp_tournament_players` + sync-metadata). `api_cache` pominięty —
+TTL-based, regeneruje się.
+
+Stare pliki kasowane: trzymamy najnowsze N (default 30), gdzie N
+można pokręcić przez `BACKUP_RETENTION_DAYS`.
+
+### 7.5. Test ręczny
+
+Po deploy:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  https://<projekt>.vercel.app/api/cron/backup
+```
+
+Odpowiedź zwraca rozmiar i row counts per tabela. Bez Bearera leci 401.
