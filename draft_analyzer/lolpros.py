@@ -20,17 +20,54 @@ między żądaniami, żeby nie obciążać serwera.
 
 from __future__ import annotations
 
+import json
+import logging
 import re
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 LOLPROS_BASE = "https://lolpros.gg/player"
 _USER_AGENT = (
     "lol-scouting-dashboard/0.1 "
     "(checking public lolpros.gg profile pages)"
 )
+
+
+# --- Region mapping ---------------------------------------------------------
+# Lolpros stores accounts with short region codes (EUW, KR, NA, ...); the
+# Riot API uses platform routing values (euw1, kr, na1, ...). Same mapping
+# the resolver / op.gg URL parser uses — kept here so this module stays
+# self-contained.
+
+_LOLPROS_REGION_TO_PLATFORM: dict[str, str] = {
+    "EUW": "euw1", "EUNE": "eun1", "KR": "kr",
+    "NA": "na1",   "BR": "br1",   "TR": "tr1",
+    "JP": "jp1",   "LAN": "la1",  "LAS": "la2",
+    "OCE": "oc1",  "RU": "ru",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class LolprosAccount:
+    """One SoloQ account listed on a player's lolpros.gg page.
+
+    `region` is the Lolpros short code (e.g. 'EUW'); `platform` is its
+    Riot-API equivalent (e.g. 'euw1'). Both are kept so callers can
+    display the source string and still feed RiotClient.
+    """
+    game_name: str
+    tag_line: str
+    region: str
+    platform: str
+
+    @property
+    def riot_id(self) -> str:
+        return f"{self.game_name}#{self.tag_line}"
 
 
 def slugify(player_id: str) -> str:
@@ -89,6 +126,124 @@ def probe_lolpros(
         return ""
 
     return url if r.status_code == 200 else ""
+
+
+def scrape_lolpros_accounts(
+    lolpros_url: str,
+    *,
+    timeout: float = 10.0,
+    session: requests.Session | None = None,
+) -> list[LolprosAccount]:
+    """Scrape the SoloQ account list from a player's lolpros.gg page.
+
+    Lolpros.gg is a Next.js SSR site — every page embeds its full state
+    as JSON in `<script id="__NEXT_DATA__">`. We parse that (stable across
+    DOM tweaks) and walk it for the accounts list. Returns [] on any
+    failure (network, parse, missing data) — caller can retry later.
+
+    Empty lolpros_url → [] (nothing to scrape).
+    Unknown region code → account skipped (we can't route Riot API for it).
+    """
+    if not lolpros_url:
+        return []
+
+    sess = session or requests
+    try:
+        r = sess.get(
+            lolpros_url,
+            allow_redirects=True,
+            timeout=timeout,
+            headers={"User-Agent": _USER_AGENT},
+        )
+    except requests.RequestException as exc:
+        logger.warning("lolpros GET fail %s: %s", lolpros_url, exc)
+        return []
+    if r.status_code != 200:
+        logger.warning("lolpros %d %s", r.status_code, lolpros_url)
+        return []
+
+    try:
+        data = _extract_next_data(r.text)
+    except ValueError as exc:
+        logger.warning("lolpros NEXT_DATA parse fail %s: %s", lolpros_url, exc)
+        return []
+
+    raw_accounts = _deep_first(data, "accounts") or []
+    if not isinstance(raw_accounts, list):
+        return []
+
+    out: list[LolprosAccount] = []
+    seen: set[tuple[str, str, str]] = set()
+    for entry in raw_accounts:
+        if not isinstance(entry, dict):
+            continue
+        # Lolpros has shuffled the schema a few times; tolerate the
+        # common shapes by checking each possible field name.
+        game_name = (
+            entry.get("game_name")
+            or entry.get("name")
+            or entry.get("summoner_name")
+            or ""
+        ).strip()
+        tag_line = (
+            entry.get("tag_line")
+            or entry.get("tag")
+            or entry.get("riot_tag")
+            or ""
+        ).strip().lstrip("#")
+        region_raw = (
+            entry.get("server")
+            or entry.get("region")
+            or entry.get("rgn")
+            or ""
+        ).strip().upper()
+        if not game_name or not region_raw:
+            continue
+        platform = _LOLPROS_REGION_TO_PLATFORM.get(region_raw)
+        if not platform:
+            continue
+        key = (game_name.lower(), tag_line.lower(), region_raw)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(LolprosAccount(
+            game_name=game_name,
+            tag_line=tag_line,
+            region=region_raw,
+            platform=platform,
+        ))
+    return out
+
+
+def _extract_next_data(html: str) -> dict:
+    """Wyciąga osadzony JSON z <script id="__NEXT_DATA__">.
+
+    Next.js'owy state strony — stabilniejszy niż HTML, ale nie API.
+    """
+    m = re.search(
+        r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>',
+        html, re.DOTALL,
+    )
+    if not m:
+        raise ValueError("Brak __NEXT_DATA__ w HTML")
+    return json.loads(m.group(1))
+
+
+def _deep_first(obj, key: str):
+    """BFS przez dict/listy — pierwsza wartość pod kluczem `key`."""
+    if isinstance(obj, dict):
+        if key in obj:
+            return obj[key]
+        for v in obj.values():
+            r = _deep_first(v, key)
+            if r is not None:
+                return r
+    elif isinstance(obj, list):
+        for v in obj:
+            r = _deep_first(v, key)
+            if r is not None:
+                return r
+    return None
 
 
 def batch_check_lolpros(

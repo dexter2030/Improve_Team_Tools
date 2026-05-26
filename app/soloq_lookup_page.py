@@ -25,12 +25,18 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from draft_analyzer.db import fetch_soloq_baseline
+from draft_analyzer.leagues import LEAGUE_GROUPS
 from src.api.riot_client import (
     PLATFORM_TO_REGION,
     RankedEntry,
     RiotClient,
 )
 from src.cache.profile_store import ProfileStore
+from src.processing.comparison import (
+    COMPARABLE_METRICS,
+    compare_to_cohort,
+)
 from src.processing.match_stats import (
     MatchStats,
     RecentPerformance,
@@ -261,6 +267,7 @@ def _fetch_and_render(
     # 5) Aggregate & render
     summary = aggregate_recent(per_match)
     _render_summary_section(summary)
+    _render_cohort_comparison(summary, per_match)
     _render_champion_section(aggregate_champions(per_match))
     _render_role_section(per_match)
     _render_match_table(per_match)
@@ -470,6 +477,135 @@ def _render_match_table(per_match: list[MatchStats]) -> None:
         for s in per_match
     ])
     st.dataframe(df, use_container_width=True, hide_index=True)
+
+
+# --- Cohort comparison -------------------------------------------------------
+
+# Mapowanie znormalizowanych ról kohorty (Top/Jungle/Mid/Bot/Support) na
+# nazwy Match-V5 (TOP/JUNGLE/MIDDLE/BOTTOM/UTILITY). UI bierze rolę
+# dominującą gracza i mapuje ją na rolę kohorty.
+_ROLE_M5_TO_COHORT = {
+    "TOP": "Top", "JUNGLE": "Jungle", "MIDDLE": "Mid",
+    "BOTTOM": "Bot", "UTILITY": "Support",
+}
+
+
+def _render_cohort_comparison(
+    summary: RecentPerformance, per_match: list[MatchStats],
+) -> None:
+    """Porównanie do kohorty zbudowanej w zakładce Cohort Baseline."""
+    st.markdown("### Compare against cohort")
+    st.caption(
+        "Compares this player to the cohort built in **Cohort Baseline** — "
+        "percentile (where they rank among peers) and Z-score (how far from "
+        "the mean, in standard deviations)."
+    )
+
+    all_leagues: list[str] = []
+    for group in LEAGUE_GROUPS.values():
+        all_leagues.extend(group)
+
+    c1, c2 = st.columns([3, 2])
+    with c1:
+        leagues = st.multiselect(
+            "Cohort leagues",
+            options=all_leagues,
+            default=st.session_state.get(
+                "soloq_compare_leagues", all_leagues
+            ),
+            key="soloq_compare_leagues",
+            help="Pick which leagues from the baseline to compare against. "
+                 "All by default — restrict to one tier for tighter comparison.",
+        )
+    # Dominująca rola gracza → odpowiadająca rola w kohorcie. Pozwalamy
+    # zmienić ręcznie (np. flex jungler scoutowany jako mid).
+    suggested_role = _dominant_role_label(per_match)
+    role_options = ["(any role)", "Top", "Jungle", "Mid", "Bot", "Support"]
+    default_idx = (
+        role_options.index(suggested_role)
+        if suggested_role in role_options else 0
+    )
+    with c2:
+        role = st.selectbox(
+            "Role filter",
+            options=role_options,
+            index=default_idx,
+            help="Default: player's dominant role in this window.",
+        )
+
+    roles_arg = None if role == "(any role)" else [role]
+    rows = fetch_soloq_baseline(leagues=leagues or None, roles=roles_arg)
+    if not rows:
+        st.info(
+            "No baseline rows for that league/role combination. Build the "
+            "cohort first in the **Cohort Baseline** tab."
+        )
+        return
+    st.caption(f"Comparing against {len(rows)} cohort entries.")
+
+    results = compare_to_cohort(summary, rows)
+    df = pd.DataFrame([
+        {
+            "Metric":         r.label,
+            "Player":         _fmt_metric(r.metric, r.player_value),
+            "Cohort mean":    _fmt_metric(r.metric, r.cohort.mean),
+            "Median":         _fmt_metric(r.metric, r.cohort.median),
+            "p25 → p75":      (
+                f"{_fmt_metric(r.metric, r.cohort.p25)} → "
+                f"{_fmt_metric(r.metric, r.cohort.p75)}"
+                if r.cohort.p25 is not None else "—"
+            ),
+            "Percentile":     (
+                f"{r.percentile:.0f}" if r.percentile is not None else "—"
+            ),
+            "Z-score":        (
+                f"{r.z_score:+.2f}" if r.z_score is not None else "—"
+            ),
+        }
+        for r in results
+    ])
+
+    def _color_z(val: str) -> str:
+        try:
+            z = float(val)
+        except (ValueError, TypeError):
+            return ""
+        # Negatywne dla "lower is better" już są oznaczone w COMPARABLE_METRICS;
+        # tu kolorujemy tylko czysty znak. Niezdarzające się metryki dwukierunkowe
+        # są w COMPARABLE_METRICS jako higher_is_better=None — koloru nie tracimy,
+        # zostaje neutralna kolumna.
+        if z >= 1.0:
+            return "background-color:#c8e6c9; color:#155724; font-weight:600;"
+        if z <= -1.0:
+            return "background-color:#f8d7da; color:#721c24; font-weight:600;"
+        return ""
+
+    styled = df.style.map(_color_z, subset=["Z-score"])
+    st.dataframe(styled, use_container_width=True, hide_index=True)
+
+
+def _dominant_role_label(per_match: list[MatchStats]) -> str:
+    """Zwraca rolę kohorty (Top/Jungle/Mid/Bot/Support) dla gracza."""
+    from collections import Counter
+    roles = Counter(s.role for s in per_match if s.role)
+    if not roles:
+        return "(any role)"
+    most, _ = roles.most_common(1)[0]
+    return _ROLE_M5_TO_COHORT.get(most.upper(), "(any role)")
+
+
+def _fmt_metric(metric_key: str, value: float | int | None) -> str:
+    if value is None:
+        return "—"
+    # Procentowe metryki renderujemy jako %.
+    if metric_key in {"winrate", "kp", "first_blood_rate"}:
+        try:
+            return f"{float(value):.0%}"
+        except (ValueError, TypeError):
+            return "—"
+    if isinstance(value, float):
+        return f"{value:.2f}".rstrip("0").rstrip(".")
+    return str(value)
 
 
 # --- Formatting helpers ------------------------------------------------------
