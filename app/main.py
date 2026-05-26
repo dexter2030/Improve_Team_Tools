@@ -54,6 +54,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 DB_PATH = PROJECT_ROOT / "scouting.db"
 
+
+def _app_version() -> str:
+    version_file = PROJECT_ROOT / "VERSION"
+    try:
+        return version_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        return "?"
+
 # Light-mode-safe colors used in both the Styler table and HTML badges.
 _STATUS: dict[str, tuple[str, str]] = {
     "resolved":   ("#c8e6c9", "#155724"),
@@ -579,6 +587,13 @@ def page_scouting_list(store: ProfileStore) -> None:
 def main() -> None:
     require_password()
     st.set_page_config(page_title="LoL Scouting Dashboard", layout="wide")
+    version = _app_version()
+    st.markdown(
+        f'<div style="text-align:right; color:#888; font-size:0.85em; '
+        f'font-family:monospace; margin-bottom:0.5em;">'
+        f'v{version}</div>',
+        unsafe_allow_html=True,
+    )
     store = get_store()
     page = render_sidebar(store)
 
