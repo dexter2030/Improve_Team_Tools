@@ -305,29 +305,45 @@ class RiotClient:
         *,
         count: int = 20,
         queue: int = 420,
+        start: int = 0,
+        start_time: int | None = None,
     ) -> list[str]:
         """Return recent match IDs for a player (Match-V5 by-puuid/ids).
 
         Args:
-            puuid:    the player's PUUID.
-            platform: a platform routing value, e.g. 'euw1'.
-            count:    how many IDs to fetch (Riot caps at 100 per call).
-            queue:    Riot queue ID. 420 = RANKED_SOLO_5x5.
+            puuid:      the player's PUUID.
+            platform:   a platform routing value, e.g. 'euw1'.
+            count:      how many IDs to fetch (Riot caps at 100 per call).
+            queue:      Riot queue ID. 420 = RANKED_SOLO_5x5. Pass 0 / falsy
+                        to disable the queue filter (Match-V5 accepts the
+                        absence of the parameter).
+            start:      offset into the player's match history. Combine with
+                        `count` to paginate (start=0, 100, 200, ...).
+            start_time: epoch seconds — only matches AFTER this point are
+                        returned. Required when scoping to a season; without
+                        it Riot returns the player's all-time history.
 
         Returns: list of match IDs, newest first. Empty list when the
-        player has no matching games.
+        player has no matching games in the window.
         """
         platform = platform.strip().lower()
         region = self._region_for(platform)
-        key = f"riot:match_ids:{region}:{puuid}:{queue}:{count}"
+        key = (
+            f"riot:match_ids:{region}:{puuid}:"
+            f"{queue}:{count}:{start}:{start_time or 0}"
+        )
         cached = self._cache_get(key)
         if cached is not None:
             return cached
 
+        kwargs: dict[str, Any] = {"start": start, "count": count}
+        if queue:
+            kwargs["queue"] = queue
+        if start_time is not None:
+            kwargs["start_time"] = start_time
+
         try:
-            ids = self._lol.match.matchlist_by_puuid(
-                region, puuid, count=count, queue=queue,
-            )
+            ids = self._lol.match.matchlist_by_puuid(region, puuid, **kwargs)
         except ApiError as err:
             if _http_status(err) == 404:
                 ids = []
@@ -336,6 +352,39 @@ class RiotClient:
         ids = list(ids or [])
         self._cache_set(key, ids, _MATCH_IDS_CACHE_TTL)
         return ids
+
+    def fetch_all_match_ids_since(
+        self,
+        puuid: str,
+        platform: str,
+        *,
+        since_epoch: int,
+        queue: int = 420,
+        page_size: int = 100,
+        hard_cap: int = 1000,
+    ) -> list[str]:
+        """Paginate `fetch_match_ids` to get every match ID after `since_epoch`.
+
+        Riot caps each call at 100 IDs (`count<=100`); the API paginates via
+        `start` offset. We keep paging until a short page comes back or
+        `hard_cap` IDs collected — the latter guards against runaway loops
+        if Riot's `start_time` filter were ever ignored.
+        """
+        out: list[str] = []
+        start = 0
+        while True:
+            batch = self.fetch_match_ids(
+                puuid, platform,
+                count=page_size, queue=queue,
+                start=start, start_time=since_epoch,
+            )
+            if not batch:
+                break
+            out.extend(batch)
+            if len(batch) < page_size or len(out) >= hard_cap:
+                break
+            start += page_size
+        return out[:hard_cap]
 
     def fetch_match(self, match_id: str, platform: str) -> dict[str, Any] | None:
         """Return the raw Match-V5 match DTO, or None if 404.

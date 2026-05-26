@@ -46,6 +46,8 @@ from draft_analyzer.players_data_page import render as render_players_data
 from draft_analyzer.match_data_page import render as render_match_data
 
 from app.settings_page import render as render_settings
+from app.soloq_lookup_page import render as render_soloq_lookup
+from app.cohort_page import render as render_cohort
 from app.auth import require_password
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -301,7 +303,8 @@ def render_sidebar(store: ProfileStore) -> str:
     page = st.sidebar.radio(
         "Navigate",
         [
-            "Scouting List", "Add Player", "Draft Analyzer", "Database",
+            "Scouting List", "Add Player", "SoloQ Lookup", "Cohort Baseline",
+            "Draft Analyzer", "Database",
             "Players Data", "Match Data", "Settings",
         ],
     )
@@ -581,6 +584,10 @@ def main() -> None:
 
     if page == "Add Player":
         page_add_player(store)
+    elif page == "SoloQ Lookup":
+        render_soloq_lookup(store, get_riot_client())
+    elif page == "Cohort Baseline":
+        render_cohort(get_riot_client())
     elif page == "Draft Analyzer":
         render_draft_analyzer()
     elif page == "Database":

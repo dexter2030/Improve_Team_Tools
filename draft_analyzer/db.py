@@ -182,6 +182,79 @@ def init_db():
                 "ALTER TABLE players_all ADD COLUMN lolpros_checked_at TEXT"
             )
 
+        # SoloQ kohorta — konta zescrap'owane z lolpros + obliczone
+        # statystyki sezonu. Dwie tabele:
+        #
+        # 1. lolpros_accounts — jeden wiersz na (gracz, konto na lolpros).
+        #    Klucz logiczny: (overview_page, riot_id, platform). Pole
+        #    `scrape_error` trzyma ostatni błąd scrapowania (NULL = sukces)
+        #    — pozwala odróżnić „nie scrapowane" od „scrapowane, brak kont".
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS lolpros_accounts (
+                overview_page  TEXT NOT NULL,
+                game_name      TEXT NOT NULL,
+                tag_line       TEXT NOT NULL,
+                region         TEXT NOT NULL,
+                platform       TEXT NOT NULL,
+                scraped_at     TEXT NOT NULL,
+                scrape_error   TEXT,
+                PRIMARY KEY (overview_page, game_name, tag_line, platform)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lolpros_accounts_player "
+            "ON lolpros_accounts(overview_page)"
+        )
+
+        # 2. soloq_baseline — jeden wiersz na (konto, cutoff). Trzymamy
+        #    surowe agregaty (kda, cs/min, ...) + role i meta. JSON
+        #    `payload` daje miejsce na nowe metryki bez migracji.
+        #    Klucz złożony: (overview_page, puuid, since_epoch).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS soloq_baseline (
+                overview_page  TEXT NOT NULL,
+                puuid          TEXT NOT NULL,
+                game_name      TEXT NOT NULL,
+                tag_line       TEXT NOT NULL,
+                platform       TEXT NOT NULL,
+                role           TEXT,            -- dominująca rola w oknie
+                league         TEXT,            -- skopiowane z players_all (pierwsza liga)
+                since_epoch    INTEGER NOT NULL,
+                games          INTEGER NOT NULL,
+                winrate        REAL,
+                kda            REAL,
+                cs_per_min     REAL,
+                dpm            REAL,
+                gold_per_min   REAL,
+                damage_taken_per_min REAL,
+                vision_per_min REAL,
+                wards_per_min  REAL,
+                kp             REAL,
+                cs10           REAL,
+                gd15           REAL,
+                solo_kills     REAL,
+                first_blood_rate REAL,
+                tier           TEXT,
+                rank           TEXT,
+                lp             INTEGER,
+                computed_at    TEXT NOT NULL,
+                payload        TEXT,             -- JSON dla nowych metryk
+                PRIMARY KEY (overview_page, puuid, since_epoch)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_soloq_baseline_role "
+            "ON soloq_baseline(role)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_soloq_baseline_league "
+            "ON soloq_baseline(league)"
+        )
+
 
 def upsert_draft(d: dict):
     """Wstawia lub aktualizuje jeden draft. `d` to słownik z polami tabeli."""
@@ -592,3 +665,309 @@ def count_lolpros_unchecked() -> int:
             "SELECT COUNT(*) AS n FROM players_all "
             "WHERE lolpros_checked_at IS NULL"
         ).fetchone()["n"]
+
+
+# --- Kohorta SoloQ: lolpros_accounts + soloq_baseline -----------------------
+
+def players_with_lolpros() -> list[dict]:
+    """Wszyscy gracze z niepustym lolpros_url (kandydaci do scrapowania kont).
+
+    Zwraca też role i ligi — używamy ich w UI do filtrów. Dla `league`
+    bierzemy DOWOLNĄ ligę z players (LIMIT 1) — gracz może występować w
+    kilku, ale do filtra kohorty jedna wystarcza.
+    """
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT pa.overview_page, pa.player_id, pa.role, pa.country,
+                   pa.nationality_primary, pa.lolpros_url,
+                   (SELECT p.league FROM players p
+                      WHERE p.overview_page = pa.overview_page
+                      LIMIT 1) AS league
+              FROM players_all pa
+             WHERE pa.lolpros_url IS NOT NULL
+               AND pa.lolpros_url != ''
+             ORDER BY pa.player_id COLLATE NOCASE
+            """
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def upsert_lolpros_accounts(
+    overview_page: str,
+    accounts: list[dict],
+    *,
+    scrape_error: str | None = None,
+) -> None:
+    """Zapisuje listę kont scrap'owanych z lolpros dla jednego gracza.
+
+    Każdy `accounts[i]` to słownik z polami: game_name, tag_line, region,
+    platform. Wcześniejsze rekordy gracza nie są kasowane — kolejne scrap
+    nadpisuje wpisy o tym samym (riot_id, platform) i dokleja nowe. Pusty
+    `accounts` z niepustym `scrape_error` zapisuje placeholder, żeby UI
+    wiedział że scrap był zrobiony i się wywalił.
+    """
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_conn() as conn:
+        if not accounts:
+            # Placeholder żeby odróżnić "scrap zrobiony, brak kont" od "nigdy
+            # nie scrapowane" (= overview_page nie ma w lolpros_accounts).
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO lolpros_accounts (
+                    overview_page, game_name, tag_line, region, platform,
+                    scraped_at, scrape_error
+                ) VALUES (?, '', '', '', '', ?, ?)
+                """,
+                (overview_page, now, scrape_error or ""),
+            )
+            return
+        for acc in accounts:
+            conn.execute(
+                """
+                INSERT INTO lolpros_accounts (
+                    overview_page, game_name, tag_line, region, platform,
+                    scraped_at, scrape_error
+                ) VALUES (
+                    :overview_page, :game_name, :tag_line, :region, :platform,
+                    :scraped_at, NULL
+                )
+                ON CONFLICT(overview_page, game_name, tag_line, platform)
+                DO UPDATE SET
+                    region       = excluded.region,
+                    scraped_at   = excluded.scraped_at,
+                    scrape_error = NULL
+                """,
+                {
+                    "overview_page": overview_page,
+                    "game_name": acc["game_name"],
+                    "tag_line":  acc["tag_line"],
+                    "region":    acc["region"],
+                    "platform":  acc["platform"],
+                    "scraped_at": now,
+                },
+            )
+
+
+def fetch_lolpros_accounts(overview_page: str) -> list[dict]:
+    """Konta z lolpros zapisane dla jednego gracza (bez placeholderów pustych)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM lolpros_accounts
+             WHERE overview_page = ?
+               AND game_name != ''
+             ORDER BY platform, game_name
+            """,
+            (overview_page,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def fetch_all_lolpros_accounts() -> list[dict]:
+    """Wszystkie scrap'owane konta wszystkich graczy (bez placeholderów)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT la.*, pa.player_id, pa.role,
+                   (SELECT p.league FROM players p
+                      WHERE p.overview_page = la.overview_page
+                      LIMIT 1) AS league
+              FROM lolpros_accounts la
+              LEFT JOIN players_all pa ON pa.overview_page = la.overview_page
+             WHERE la.game_name != ''
+             ORDER BY pa.player_id COLLATE NOCASE
+            """
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def count_lolpros_scraped() -> int:
+    """Ilu graczy ma scrap'owane konta (z placeholderem pustym włącznie)."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT COUNT(DISTINCT overview_page) AS n FROM lolpros_accounts"
+        ).fetchone()["n"]
+
+
+def players_needing_lolpros_scrape() -> list[dict]:
+    """Gracze z lolpros_url, których jeszcze nie scrapowaliśmy.
+
+    Definicja „jeszcze nie": overview_page nieobecny w lolpros_accounts.
+    Wynik zachowuje role i ligę, żeby filtry UI mogły z niego korzystać.
+    """
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT pa.overview_page, pa.player_id, pa.role,
+                   pa.lolpros_url,
+                   (SELECT p.league FROM players p
+                      WHERE p.overview_page = pa.overview_page
+                      LIMIT 1) AS league
+              FROM players_all pa
+             WHERE pa.lolpros_url IS NOT NULL
+               AND pa.lolpros_url != ''
+               AND NOT EXISTS (
+                   SELECT 1 FROM lolpros_accounts la
+                    WHERE la.overview_page = pa.overview_page
+               )
+             ORDER BY pa.player_id COLLATE NOCASE
+            """
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def upsert_soloq_baseline(row: dict) -> None:
+    """Zapisuje (lub nadpisuje) jeden wpis baseline.
+
+    `row` musi mieć: overview_page, puuid, game_name, tag_line, platform,
+    since_epoch, games. Reszta pól opcjonalna — None zapisze NULL.
+    `payload` (dict) jest serializowany do JSON.
+    """
+    now = datetime.now().isoformat(timespec="seconds")
+    payload_json = json.dumps(row.get("payload") or {})
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO soloq_baseline (
+                overview_page, puuid, game_name, tag_line, platform,
+                role, league, since_epoch, games, winrate,
+                kda, cs_per_min, dpm, gold_per_min,
+                damage_taken_per_min, vision_per_min, wards_per_min,
+                kp, cs10, gd15, solo_kills, first_blood_rate,
+                tier, rank, lp, computed_at, payload
+            ) VALUES (
+                :overview_page, :puuid, :game_name, :tag_line, :platform,
+                :role, :league, :since_epoch, :games, :winrate,
+                :kda, :cs_per_min, :dpm, :gold_per_min,
+                :damage_taken_per_min, :vision_per_min, :wards_per_min,
+                :kp, :cs10, :gd15, :solo_kills, :first_blood_rate,
+                :tier, :rank, :lp, :computed_at, :payload
+            )
+            ON CONFLICT(overview_page, puuid, since_epoch) DO UPDATE SET
+                role           = excluded.role,
+                league         = excluded.league,
+                games          = excluded.games,
+                winrate        = excluded.winrate,
+                kda            = excluded.kda,
+                cs_per_min     = excluded.cs_per_min,
+                dpm            = excluded.dpm,
+                gold_per_min   = excluded.gold_per_min,
+                damage_taken_per_min = excluded.damage_taken_per_min,
+                vision_per_min = excluded.vision_per_min,
+                wards_per_min  = excluded.wards_per_min,
+                kp             = excluded.kp,
+                cs10           = excluded.cs10,
+                gd15           = excluded.gd15,
+                solo_kills     = excluded.solo_kills,
+                first_blood_rate = excluded.first_blood_rate,
+                tier           = excluded.tier,
+                rank           = excluded.rank,
+                lp             = excluded.lp,
+                computed_at    = excluded.computed_at,
+                payload        = excluded.payload
+            """,
+            {
+                **{
+                    k: row.get(k) for k in (
+                        "overview_page", "puuid", "game_name", "tag_line",
+                        "platform", "role", "league", "since_epoch", "games",
+                        "winrate", "kda", "cs_per_min", "dpm", "gold_per_min",
+                        "damage_taken_per_min", "vision_per_min",
+                        "wards_per_min", "kp", "cs10", "gd15", "solo_kills",
+                        "first_blood_rate", "tier", "rank", "lp",
+                    )
+                },
+                "computed_at": now,
+                "payload": payload_json,
+            },
+        )
+
+
+def fetch_soloq_baseline(
+    leagues: list[str] | None = None,
+    roles: list[str] | None = None,
+    *,
+    since_epoch: int | None = None,
+) -> list[dict]:
+    """Pobiera wiersze kohorty z opcjonalnymi filtrami liga/rola/cutoff.
+
+    `leagues` to lista krótkich nazw (LEC, LCK, ...) — dopasowuje po
+    podciągu kolumny league (NLC ⊆ "NLC 2026 Spring"). `since_epoch`
+    pozwala wybrać tylko wpisy obliczone dla konkretnego cutoff.
+    """
+    clauses: list[str] = []
+    params: list = []
+    if leagues:
+        league_clauses = []
+        for lg in leagues:
+            league_clauses.append(
+                "LOWER(league) LIKE '%' || LOWER(?) || '%'"
+            )
+            params.append(lg)
+        clauses.append("(" + " OR ".join(league_clauses) + ")")
+    if roles:
+        placeholders = ",".join("?" * len(roles))
+        clauses.append(f"role IN ({placeholders})")
+        params.extend(roles)
+    if since_epoch is not None:
+        clauses.append("since_epoch = ?")
+        params.append(since_epoch)
+    sql = "SELECT * FROM soloq_baseline"
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY overview_page, since_epoch DESC"
+    with get_conn() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        if d.get("payload"):
+            try:
+                d["payload"] = json.loads(d["payload"])
+            except json.JSONDecodeError:
+                d["payload"] = {}
+        out.append(d)
+    return out
+
+
+def count_soloq_baseline_for_cutoff(since_epoch: int) -> int:
+    """Ile wpisów baseline policzono dla danego cutoff."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) AS n FROM soloq_baseline WHERE since_epoch = ?",
+            (since_epoch,),
+        ).fetchone()["n"]
+
+
+def accounts_needing_baseline(since_epoch: int) -> list[dict]:
+    """Konta z lolpros_accounts, dla których nie ma baseline z danym cutoff.
+
+    Każdy wiersz ma overview_page, game_name, tag_line, platform, role,
+    league (potrzebne potem do zapisu baseline).
+    """
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT la.overview_page, la.game_name, la.tag_line,
+                   la.region, la.platform,
+                   pa.role,
+                   (SELECT p.league FROM players p
+                      WHERE p.overview_page = la.overview_page
+                      LIMIT 1) AS league
+              FROM lolpros_accounts la
+              LEFT JOIN players_all pa ON pa.overview_page = la.overview_page
+             WHERE la.game_name != ''
+               AND NOT EXISTS (
+                   SELECT 1 FROM soloq_baseline sb
+                    WHERE sb.overview_page = la.overview_page
+                      AND sb.game_name     = la.game_name
+                      AND sb.tag_line      = la.tag_line
+                      AND sb.platform      = la.platform
+                      AND sb.since_epoch   = ?
+               )
+             ORDER BY pa.player_id COLLATE NOCASE
+            """,
+            (since_epoch,),
+        ).fetchall()
+    return [dict(r) for r in rows]
