@@ -14,11 +14,14 @@ const COOKIE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 // Te ścieżki nie wymagają auth.
 // /api/health/* zostawione publiczne — przydatne do uptime monitoring
 // (Vercel/UptimeRobot/etc.) bez konieczności obsługiwania cookies.
+// /api/cron/* ma własną auth przez `Authorization: Bearer ${CRON_SECRET}`,
+// którą Vercel Cron ustawia automatycznie — cookie tu nie dotrze.
 const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
   "/api/health",
+  "/api/cron",
 ];
 
 export async function proxy(req: NextRequest) {
