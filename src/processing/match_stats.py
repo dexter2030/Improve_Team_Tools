@@ -26,9 +26,19 @@ from typing import Sequence
 
 @dataclass(frozen=True, slots=True)
 class MatchStats:
-    """Per-match metrics for one player; numbers ready for averaging."""
+    """Per-match metrics for one player; numbers ready for averaging.
+
+    Fields cover the four buckets a scout reads: laning (cs_per_min, cs10,
+    gd15, solo_kills, first_blood_*), teamfight contribution (kda, kp, dpm,
+    damage_taken_per_min), vision (vision_score, vision_per_min,
+    wards_placed, wards_killed, control_wards_bought), and economy
+    (gold_per_min). Plus identity (champion, role) so the same MatchStats
+    list aggregates per-champion or per-role without a second pass.
+    """
     match_id: str
     win: bool
+    champion: str
+    role: str | None        # 'TOP'/'JUNGLE'/'MIDDLE'/'BOTTOM'/'UTILITY', None if blank
     kills: int
     deaths: int
     assists: int
@@ -36,6 +46,16 @@ class MatchStats:
     cs: int
     cs_per_min: float
     dpm: float
+    gold_per_min: float
+    damage_taken_per_min: float
+    vision_score: int
+    vision_per_min: float
+    wards_placed: int
+    wards_killed: int
+    control_wards_bought: int
+    solo_kills: int | None  # From challenges.soloKills; None if challenges absent
+    first_blood_kill: bool
+    first_blood_assist: bool
     kp: float | None        # None when team kills == 0 (no kills team-wide)
     cs10: int | None        # None when timeline missing/short
     gd15: int | None        # None when opponent can't be identified
@@ -45,16 +65,27 @@ class MatchStats:
 
 @dataclass(frozen=True, slots=True)
 class RecentPerformance:
-    """Averaged scouting metrics across a window of recent matches."""
+    """Averaged scouting metrics across a window of recent matches.
+
+    Each averaged field skips matches where its source value was None, so
+    a 20-match window where 15 timelines were available still yields a
+    valid `cs10`/`gd15` average over those 15.
+    """
     games: int
     wins: int
     winrate: float | None
     kda: float | None
     cs_per_min: float | None
     dpm: float | None
+    gold_per_min: float | None
+    damage_taken_per_min: float | None
+    vision_per_min: float | None
+    wards_per_min: float | None
     kp: float | None
     cs10: float | None
     gd15: float | None
+    solo_kills: float | None
+    first_blood_rate: float | None   # share of games with FB kill or assist
 
 
 # --- Per-match ---------------------------------------------------------------
@@ -84,6 +115,12 @@ def compute_match_stats(
     cs = ((me.get("totalMinionsKilled", 0) or 0)
           + (me.get("neutralMinionsKilled", 0) or 0))
     damage = me.get("totalDamageDealtToChampions", 0) or 0
+    damage_taken = me.get("totalDamageTaken", 0) or 0
+    gold = me.get("goldEarned", 0) or 0
+    vision_score = me.get("visionScore", 0) or 0
+    wards_placed = me.get("wardsPlaced", 0) or 0
+    wards_killed = me.get("wardsKilled", 0) or 0
+    control_wards = me.get("visionWardsBoughtInGame", 0) or 0
 
     team_kills = sum(
         (p.get("kills", 0) or 0)
@@ -95,6 +132,20 @@ def compute_match_stats(
     dpm = damage / duration_min
     cs_per_min = cs / duration_min
     kp = (kills + assists) / team_kills if team_kills else None
+
+    # `challenges` is opt-in on Match-V5 and missing for legacy/abandoned
+    # games — fall back to None rather than imputing a zero.
+    challenges = me.get("challenges") or {}
+    solo_kills_raw = challenges.get("soloKills")
+    solo_kills = (
+        int(solo_kills_raw) if isinstance(solo_kills_raw, (int, float))
+        else None
+    )
+
+    role_raw = (me.get("teamPosition") or me.get("individualPosition") or "")
+    role_norm = role_raw.strip().upper() or None
+    if role_norm == "INVALID":
+        role_norm = None
 
     cs10: int | None = None
     gd15: int | None = None
@@ -119,6 +170,8 @@ def compute_match_stats(
     return MatchStats(
         match_id=(match.get("metadata", {}) or {}).get("matchId", ""),
         win=bool(me.get("win")),
+        champion=me.get("championName", "") or "",
+        role=role_norm,
         kills=kills,
         deaths=deaths,
         assists=assists,
@@ -126,6 +179,16 @@ def compute_match_stats(
         cs=cs,
         cs_per_min=round(cs_per_min, 2),
         dpm=round(dpm, 1),
+        gold_per_min=round(gold / duration_min, 1),
+        damage_taken_per_min=round(damage_taken / duration_min, 1),
+        vision_score=vision_score,
+        vision_per_min=round(vision_score / duration_min, 2),
+        wards_placed=wards_placed,
+        wards_killed=wards_killed,
+        control_wards_bought=control_wards,
+        solo_kills=solo_kills,
+        first_blood_kill=bool(me.get("firstBloodKill")),
+        first_blood_assist=bool(me.get("firstBloodAssist")),
         kp=round(kp, 3) if kp is not None else None,
         cs10=cs10,
         gd15=gd15,
@@ -148,7 +211,10 @@ def aggregate_recent(stats: Sequence[MatchStats]) -> RecentPerformance:
         return RecentPerformance(
             games=0, wins=0, winrate=None,
             kda=None, cs_per_min=None, dpm=None,
+            gold_per_min=None, damage_taken_per_min=None,
+            vision_per_min=None, wards_per_min=None,
             kp=None, cs10=None, gd15=None,
+            solo_kills=None, first_blood_rate=None,
         )
 
     wins = sum(1 for s in stats if s.win)
@@ -158,6 +224,19 @@ def aggregate_recent(stats: Sequence[MatchStats]) -> RecentPerformance:
                 if getattr(s, key) is not None]
         return round(sum(vals) / len(vals), 2) if vals else None
 
+    wards_per_min_vals = [
+        (s.wards_placed / s.duration_min) for s in stats
+        if s.duration_min > 0
+    ]
+    wards_per_min = (
+        round(sum(wards_per_min_vals) / len(wards_per_min_vals), 2)
+        if wards_per_min_vals else None
+    )
+
+    fb_games = sum(
+        1 for s in stats if s.first_blood_kill or s.first_blood_assist
+    )
+
     return RecentPerformance(
         games=games,
         wins=wins,
@@ -165,9 +244,15 @@ def aggregate_recent(stats: Sequence[MatchStats]) -> RecentPerformance:
         kda=_avg("kda"),
         cs_per_min=_avg("cs_per_min"),
         dpm=_avg("dpm"),
+        gold_per_min=_avg("gold_per_min"),
+        damage_taken_per_min=_avg("damage_taken_per_min"),
+        vision_per_min=_avg("vision_per_min"),
+        wards_per_min=wards_per_min,
         kp=_avg("kp"),
         cs10=_avg("cs10"),
         gd15=_avg("gd15"),
+        solo_kills=_avg("solo_kills"),
+        first_blood_rate=round(fb_games / games, 3),
     )
 
 
