@@ -14,6 +14,7 @@ import {
   Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 import { ThemeToggle } from "./theme-toggle";
 
 const NAV = [
@@ -33,9 +34,14 @@ export function Sidebar() {
   return (
     <aside className="w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex flex-col">
       <div className="px-6 py-5 border-b border-sidebar-border">
-        <h1 className="text-lg font-semibold tracking-tight">
-          Improve Team Tools
-        </h1>
+        <div className="flex items-baseline justify-between gap-2">
+          <h1 className="text-lg font-semibold tracking-tight">
+            Improve Team Tools
+          </h1>
+          <span className="text-[11px] font-mono text-muted-foreground shrink-0">
+            v{APP_VERSION}
+          </span>
+        </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           LoL Scouting Dashboard
         </p>
