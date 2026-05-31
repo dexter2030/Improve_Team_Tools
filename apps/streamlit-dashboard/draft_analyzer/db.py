@@ -15,12 +15,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from src.paths import DRAFTS_DB
+from src.paths import COHORT_DB, DRAFTS_DB, PLAYERS_DB
 from .leagues import more_specific
-
-# Ścieżka bazy draftów (+ gracze + kohorta na tym etapie). Scentralizowana
-# w src/paths.py (data/). P3 rozdzieli to na drafts/players/cohort.
-DB_PATH = DRAFTS_DB
 
 # TTL dla cache'u odczytów (sekundy). Streamlit rerunuje stronę przy każdej
 # interakcji widżetu (klik w patch multiselect, zmiana checkboxa, ...), a
@@ -31,9 +27,17 @@ _READ_TTL = 300
 
 
 @contextmanager
-def get_conn():
-    conn = sqlite3.connect(DB_PATH)
+def _connect(db_path, attach: dict | None = None):
+    """Połączenie do jednej bazy domenowej.
+
+    `attach` (mapa alias -> ścieżka) dokłada inne pliki przez ATTACH DATABASE —
+    używane przez kohortę, której zapytania JOIN-ują tabele z players.db.
+    """
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    if attach:
+        for alias, path in attach.items():
+            conn.execute(f"ATTACH DATABASE ? AS {alias}", (str(path),))
     try:
         yield conn
         conn.commit()
@@ -41,9 +45,33 @@ def get_conn():
         conn.close()
 
 
+def get_conn_drafts():
+    """drafts.db — drafty + metadane synchronizacji lig (league_sync)."""
+    return _connect(DRAFTS_DB)
+
+
+def get_conn_players():
+    """players.db — rostery z lig + globalna baza graczy."""
+    return _connect(PLAYERS_DB)
+
+
+def get_conn_cohort():
+    """cohort.db (lolpros_accounts + soloq_baseline), z players.db pod aliasem
+    `players_db` — zapytania kohorty JOIN-ują players_all/players przez ATTACH.
+    """
+    return _connect(COHORT_DB, attach={"players_db": PLAYERS_DB})
+
+
 def init_db():
-    """Tworzy tabele, jeśli nie istnieją."""
-    with get_conn() as conn:
+    """Tworzy tabele we wszystkich bazach domenowych (idempotentnie)."""
+    _init_drafts()
+    _init_players()
+    _init_cohort()
+
+
+def _init_drafts():
+    """drafts.db — drafty + metadane synchronizacji lig (league_sync)."""
+    with get_conn_drafts() as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS drafts (
@@ -92,6 +120,10 @@ def init_db():
             """
         )
 
+
+def _init_players():
+    """players.db — rostery z lig + globalna baza graczy."""
+    with get_conn_players() as conn:
         # Baza graczy z lig (z TournamentPlayers + Players na Leaguepedia).
         # Klucz złożony (overview_page, league) — ten sam gracz może
         # pojawić się w wielu ligach (np. transfer z LEC do LCS),
@@ -194,6 +226,10 @@ def init_db():
                 "ALTER TABLE players_all ADD COLUMN lolpros_checked_at TEXT"
             )
 
+
+def _init_cohort():
+    """cohort.db — konta lolpros + baseline SoloQ."""
+    with get_conn_cohort() as conn:
         # SoloQ kohorta — konta zescrap'owane z lolpros + obliczone
         # statystyki sezonu. Dwie tabele:
         #
@@ -270,7 +306,7 @@ def init_db():
 
 def upsert_draft(d: dict):
     """Wstawia lub aktualizuje jeden draft. `d` to słownik z polami tabeli."""
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         conn.execute(
             """
             INSERT INTO drafts (
@@ -322,7 +358,7 @@ def fetch_all_drafts(patches: list[str] | None = None) -> list[dict]:
         query += f" WHERE patch IN ({placeholders})"
         params = patches
 
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         rows = conn.execute(query, params).fetchall()
 
     out = []
@@ -337,7 +373,7 @@ def fetch_all_drafts(patches: list[str] | None = None) -> list[dict]:
 @st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def list_patches() -> list[str]:
     """Lista dostępnych patchy, od najnowszego."""
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         rows = conn.execute(
             "SELECT DISTINCT patch FROM drafts WHERE patch IS NOT NULL "
             "ORDER BY patch DESC"
@@ -348,7 +384,7 @@ def list_patches() -> list[str]:
 @st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def list_teams() -> list[str]:
     """Lista drużyn występujących po stronie blue, alfabetycznie."""
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         rows = conn.execute(
             "SELECT DISTINCT blue_team FROM drafts "
             "WHERE blue_team IS NOT NULL AND blue_team != '' "
@@ -360,7 +396,7 @@ def list_teams() -> list[str]:
 @st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def count_all_drafts() -> int:
     """Łączna liczba draftów w bazie."""
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         return conn.execute("SELECT COUNT(*) AS n FROM drafts").fetchone()["n"]
 
 
@@ -380,7 +416,7 @@ def count_drafts_for_league(league: str) -> int:
         clauses.append("LOWER(league) NOT LIKE '%' || LOWER(?) || '%'")
         params.append(excl)
     sql = "SELECT COUNT(*) AS n FROM drafts WHERE " + " AND ".join(clauses)
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         row = conn.execute(sql, params).fetchone()
     return row["n"]
 
@@ -389,7 +425,7 @@ def count_drafts_for_league(league: str) -> int:
 
 def get_league_sync(league: str) -> dict | None:
     """Wiersz league_sync danej ligi (krótka nazwa) albo None, gdy brak."""
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         row = conn.execute(
             "SELECT * FROM league_sync WHERE league = ?", (league,)
         ).fetchone()
@@ -399,7 +435,7 @@ def get_league_sync(league: str) -> dict | None:
 @st.cache_data(ttl=_READ_TTL, show_spinner=False)
 def all_league_sync() -> dict[str, dict]:
     """Cała tabela league_sync jako mapa: krótka nazwa ligi -> wiersz."""
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         rows = conn.execute("SELECT * FROM league_sync").fetchall()
     return {r["league"]: dict(r) for r in rows}
 
@@ -429,7 +465,7 @@ def mark_league_fetched(league: str, last_game_date: str | None) -> None:
     Wołać dopiero po pełnym przejściu ligi — uzasadnienie w sync.py.
     """
     now = datetime.now().isoformat(timespec="seconds")
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         conn.execute(
             """
             INSERT INTO league_sync (league, last_fetched, last_game_date)
@@ -450,7 +486,7 @@ def set_remote_total(league: str, total: int) -> None:
     wymaga zapytania do API — odświeżany przy każdym wczytaniu ligi.
     """
     now = datetime.now().isoformat(timespec="seconds")
-    with get_conn() as conn:
+    with get_conn_drafts() as conn:
         conn.execute(
             """
             INSERT INTO league_sync (league, remote_total, remote_checked)
@@ -474,7 +510,7 @@ def upsert_player(p: dict, league: str) -> None:
     `league` — krótka nazwa ligi (z LEAGUE_GROUPS), część klucza złożonego.
     """
     now = datetime.now().isoformat(timespec="seconds")
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         conn.execute(
             """
             INSERT INTO players (
@@ -523,14 +559,14 @@ def fetch_all_players(league: str | None = None) -> list[dict]:
         query += " WHERE league = ?"
         params = [league]
     query += " ORDER BY league, team, role, player_id"
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         rows = conn.execute(query, params).fetchall()
     return [dict(r) for r in rows]
 
 
 def count_all_players() -> int:
     """Łączna liczba wierszy w tabeli players (UWAGA: nie unikaty graczy)."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         return conn.execute(
             "SELECT COUNT(*) AS n FROM players"
         ).fetchone()["n"]
@@ -538,7 +574,7 @@ def count_all_players() -> int:
 
 def count_unique_players() -> int:
     """Liczba unikalnych graczy (po overview_page) — gracz może być w wielu ligach."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         return conn.execute(
             "SELECT COUNT(DISTINCT overview_page) AS n FROM players"
         ).fetchone()["n"]
@@ -546,7 +582,7 @@ def count_unique_players() -> int:
 
 def count_players_for_league(league: str) -> int:
     """Liczba graczy zapisanych w bazie dla danej ligi."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         return conn.execute(
             "SELECT COUNT(*) AS n FROM players WHERE league = ?", (league,)
         ).fetchone()["n"]
@@ -554,7 +590,7 @@ def count_players_for_league(league: str) -> int:
 
 def get_players_sync(league: str) -> dict | None:
     """Wiersz players_sync danej ligi (krótka nazwa) albo None, gdy brak."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         row = conn.execute(
             "SELECT * FROM players_sync WHERE league = ?", (league,)
         ).fetchone()
@@ -563,7 +599,7 @@ def get_players_sync(league: str) -> dict | None:
 
 def all_players_sync() -> dict[str, dict]:
     """Cała tabela players_sync jako mapa: krótka nazwa ligi -> wiersz."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         rows = conn.execute("SELECT * FROM players_sync").fetchall()
     return {r["league"]: dict(r) for r in rows}
 
@@ -571,7 +607,7 @@ def all_players_sync() -> dict[str, dict]:
 def mark_players_fetched(league: str, player_count: int) -> None:
     """Odnotowuje udane pobranie graczy danej ligi (znacznik czasu + licznik)."""
     now = datetime.now().isoformat(timespec="seconds")
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         conn.execute(
             """
             INSERT INTO players_sync (league, last_fetched, player_count)
@@ -598,7 +634,7 @@ def upsert_all_player(p: dict) -> None:
     odświeżenie metadanych z Leaguepedia nie powinno tego kasować.
     """
     now = datetime.now().isoformat(timespec="seconds")
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         conn.execute(
             """
             INSERT INTO players_all (
@@ -636,7 +672,7 @@ def upsert_all_player(p: dict) -> None:
 
 def fetch_all_players_global() -> list[dict]:
     """Wszystkie wiersze z globalnej bazy graczy, posortowane po nicku."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         rows = conn.execute(
             "SELECT * FROM players_all ORDER BY player_id COLLATE NOCASE"
         ).fetchall()
@@ -645,7 +681,7 @@ def fetch_all_players_global() -> list[dict]:
 
 def count_all_players_global() -> int:
     """Liczba wierszy w globalnej bazie graczy."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         return conn.execute(
             "SELECT COUNT(*) AS n FROM players_all"
         ).fetchone()["n"]
@@ -653,7 +689,7 @@ def count_all_players_global() -> int:
 
 def get_all_players_global_sync() -> dict | None:
     """Pojedynczy wiersz players_all_sync (singleton)."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         row = conn.execute(
             "SELECT * FROM players_all_sync WHERE id = 1"
         ).fetchone()
@@ -663,7 +699,7 @@ def get_all_players_global_sync() -> dict | None:
 def mark_all_players_fetched(player_count: int) -> None:
     """Odnotowuje pełne pobranie globalnej bazy graczy (znacznik + licznik)."""
     now = datetime.now().isoformat(timespec="seconds")
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         conn.execute(
             """
             INSERT INTO players_all_sync (id, last_fetched, player_count)
@@ -684,7 +720,7 @@ def update_lolpros(overview_page: str, url: str | None) -> None:
     — odróżnia się trzy stany w UI (—, ❌, link).
     """
     now = datetime.now().isoformat(timespec="seconds")
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         conn.execute(
             """
             UPDATE players_all
@@ -698,7 +734,7 @@ def update_lolpros(overview_page: str, url: str | None) -> None:
 
 def count_lolpros_unchecked() -> int:
     """Ilu graczy w globalnej bazie nie ma jeszcze sprawdzonego lolpros."""
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         return conn.execute(
             "SELECT COUNT(*) AS n FROM players_all "
             "WHERE lolpros_checked_at IS NULL"
@@ -714,7 +750,7 @@ def players_with_lolpros() -> list[dict]:
     bierzemy DOWOLNĄ ligę z players (LIMIT 1) — gracz może występować w
     kilku, ale do filtra kohorty jedna wystarcza.
     """
-    with get_conn() as conn:
+    with get_conn_players() as conn:
         rows = conn.execute(
             """
             SELECT pa.overview_page, pa.player_id, pa.role, pa.country,
@@ -746,7 +782,7 @@ def upsert_lolpros_accounts(
     wiedział że scrap był zrobiony i się wywalił.
     """
     now = datetime.now().isoformat(timespec="seconds")
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         if not accounts:
             # Placeholder żeby odróżnić "scrap zrobiony, brak kont" od "nigdy
             # nie scrapowane" (= overview_page nie ma w lolpros_accounts).
@@ -789,7 +825,7 @@ def upsert_lolpros_accounts(
 
 def fetch_lolpros_accounts(overview_page: str) -> list[dict]:
     """Konta z lolpros zapisane dla jednego gracza (bez placeholderów pustych)."""
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         rows = conn.execute(
             """
             SELECT * FROM lolpros_accounts
@@ -804,15 +840,15 @@ def fetch_lolpros_accounts(overview_page: str) -> list[dict]:
 
 def fetch_all_lolpros_accounts() -> list[dict]:
     """Wszystkie scrap'owane konta wszystkich graczy (bez placeholderów)."""
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         rows = conn.execute(
             """
             SELECT la.*, pa.player_id, pa.role,
-                   (SELECT p.league FROM players p
+                   (SELECT p.league FROM players_db.players p
                       WHERE p.overview_page = la.overview_page
                       LIMIT 1) AS league
               FROM lolpros_accounts la
-              LEFT JOIN players_all pa ON pa.overview_page = la.overview_page
+              LEFT JOIN players_db.players_all pa ON pa.overview_page = la.overview_page
              WHERE la.game_name != ''
              ORDER BY pa.player_id COLLATE NOCASE
             """
@@ -822,7 +858,7 @@ def fetch_all_lolpros_accounts() -> list[dict]:
 
 def count_lolpros_scraped() -> int:
     """Ilu graczy ma scrap'owane konta (z placeholderem pustym włącznie)."""
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         return conn.execute(
             "SELECT COUNT(DISTINCT overview_page) AS n FROM lolpros_accounts"
         ).fetchone()["n"]
@@ -834,15 +870,15 @@ def players_needing_lolpros_scrape() -> list[dict]:
     Definicja „jeszcze nie": overview_page nieobecny w lolpros_accounts.
     Wynik zachowuje role i ligę, żeby filtry UI mogły z niego korzystać.
     """
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         rows = conn.execute(
             """
             SELECT pa.overview_page, pa.player_id, pa.role,
                    pa.lolpros_url,
-                   (SELECT p.league FROM players p
+                   (SELECT p.league FROM players_db.players p
                       WHERE p.overview_page = pa.overview_page
                       LIMIT 1) AS league
-              FROM players_all pa
+              FROM players_db.players_all pa
              WHERE pa.lolpros_url IS NOT NULL
                AND pa.lolpros_url != ''
                AND NOT EXISTS (
@@ -864,7 +900,7 @@ def upsert_soloq_baseline(row: dict) -> None:
     """
     now = datetime.now().isoformat(timespec="seconds")
     payload_json = json.dumps(row.get("payload") or {})
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         conn.execute(
             """
             INSERT INTO soloq_baseline (
@@ -955,7 +991,7 @@ def fetch_soloq_baseline(
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     sql += " ORDER BY overview_page, since_epoch DESC"
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         rows = conn.execute(sql, params).fetchall()
     out = []
     for r in rows:
@@ -971,7 +1007,7 @@ def fetch_soloq_baseline(
 
 def count_soloq_baseline_for_cutoff(since_epoch: int) -> int:
     """Ile wpisów baseline policzono dla danego cutoff."""
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         return conn.execute(
             "SELECT COUNT(*) AS n FROM soloq_baseline WHERE since_epoch = ?",
             (since_epoch,),
@@ -984,17 +1020,17 @@ def accounts_needing_baseline(since_epoch: int) -> list[dict]:
     Każdy wiersz ma overview_page, game_name, tag_line, platform, role,
     league (potrzebne potem do zapisu baseline).
     """
-    with get_conn() as conn:
+    with get_conn_cohort() as conn:
         rows = conn.execute(
             """
             SELECT la.overview_page, la.game_name, la.tag_line,
                    la.region, la.platform,
                    pa.role,
-                   (SELECT p.league FROM players p
+                   (SELECT p.league FROM players_db.players p
                       WHERE p.overview_page = la.overview_page
                       LIMIT 1) AS league
               FROM lolpros_accounts la
-              LEFT JOIN players_all pa ON pa.overview_page = la.overview_page
+              LEFT JOIN players_db.players_all pa ON pa.overview_page = la.overview_page
              WHERE la.game_name != ''
                AND NOT EXISTS (
                    SELECT 1 FROM soloq_baseline sb

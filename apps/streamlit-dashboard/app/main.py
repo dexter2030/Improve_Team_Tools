@@ -38,7 +38,7 @@ from shared.api.leaguepedia_client import LeaguepediaClient, ScoreboardRow
 from shared.api.riot_client import RankedEntry, RiotClient, SqliteCacheStore
 from src.processing.champion_stats import ChampionStat, aggregate_champion_stats
 from src.cache.profile_store import ProfileStore
-from src.paths import SCOUTING_DB
+from src.paths import CACHE_DB, PROFILES_DB
 from src.processing.links import parse_leaguepedia_url, parse_opgg_url
 from src.processing.profiles import (
     ProPlayIdentity,
@@ -60,9 +60,6 @@ from app.cohort_page import render as render_cohort
 from app.auth import require_password
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-# Ścieżka bazy profili + cache API. Scentralizowana w src/paths.py (data/).
-DB_PATH = SCOUTING_DB
 
 
 def _app_version() -> str:
@@ -102,7 +99,7 @@ def _highlight_status(val: str) -> str:
 
 @st.cache_resource
 def get_store() -> ProfileStore:
-    return ProfileStore(DB_PATH)
+    return ProfileStore(PROFILES_DB)
 
 
 @st.cache_resource
@@ -113,7 +110,7 @@ def get_resolver() -> ProfileResolver:
             "RIOT_API_KEY is not set — add it to a .env file "
             "at the project root."
         )
-    cache = SqliteCacheStore(DB_PATH)
+    cache = SqliteCacheStore(CACHE_DB)
     return ProfileResolver(
         RiotClient(api_key, cache=cache),
         LeaguepediaClient(cache),
@@ -129,13 +126,13 @@ def get_riot_client() -> RiotClient:
             "RIOT_API_KEY is not set — add it to a .env file "
             "at the project root."
         )
-    return RiotClient(api_key, cache=SqliteCacheStore(DB_PATH))
+    return RiotClient(api_key, cache=SqliteCacheStore(CACHE_DB))
 
 
 @st.cache_resource
 def get_leaguepedia_client() -> LeaguepediaClient:
     """Shared LeaguepediaClient for on-demand scoreboard fetches."""
-    return LeaguepediaClient(cache=SqliteCacheStore(DB_PATH))
+    return LeaguepediaClient(cache=SqliteCacheStore(CACHE_DB))
 
 
 # Friendly labels for the queue types we care about.

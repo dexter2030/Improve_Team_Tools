@@ -1,15 +1,19 @@
 """
 src/paths.py — centralne ścieżki baz danych aplikacji streamlit-dashboard.
 
-Wszystkie pliki .db żyją w jednym katalogu danych (`data/`), a kod sięga po
-nie przez te stałe zamiast hardcode'ować ścieżki względne. Katalog można
-nadpisać zmienną środowiskową ``DASHBOARD_DATA_DIR`` (np. w deploy/CI).
+Każda domena danych trzyma się w osobnym pliku ``.db`` w katalogu ``data/``,
+a kod sięga po nie przez te stałe zamiast hardcode'ować ścieżki względne.
+Katalog można nadpisać zmienną środowiskową ``DASHBOARD_DATA_DIR``.
 
-Etapowanie:
-- P2 (ten stan): topologia przejściowa — relokacja istniejących plików do
-  ``data/`` bez podziału tabel (dwa pliki, jak dotąd).
-- P3: podział na bazy per domena (profiles / cache / drafts / players /
-  cohort) + migracja danych.
+Podział per domena:
+- ``profiles.db`` — kuratorskie profile scoutingowe (ProfileStore).
+- ``cache.db``    — cache odpowiedzi API (SqliteCacheStore).
+- ``drafts.db``   — drafty pick&ban + metadane synchronizacji lig.
+- ``players.db``  — rostery z lig + globalna baza graczy.
+- ``cohort.db``   — konta lolpros + baseline SoloQ (kohorta).
+
+Zapytania kohorty JOIN-ują tabele z ``players.db`` — robimy to przez
+``ATTACH DATABASE`` (zob. ``draft_analyzer/db.py``: ``get_conn_cohort``).
 """
 from __future__ import annotations
 
@@ -22,6 +26,8 @@ DATA_DIR = Path(
 )
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Topologia przejściowa (P2): te same dwa pliki co wcześniej, tylko w data/.
-SCOUTING_DB = DATA_DIR / "scouting.db"  # tabele: profiles + api_cache
-DRAFTS_DB = DATA_DIR / "drafts.db"      # tabele: drafts + league_sync + players* + kohorta
+PROFILES_DB = DATA_DIR / "profiles.db"  # profiles
+CACHE_DB = DATA_DIR / "cache.db"        # api_cache
+DRAFTS_DB = DATA_DIR / "drafts.db"      # drafts, league_sync
+PLAYERS_DB = DATA_DIR / "players.db"    # players, players_sync, players_all, players_all_sync
+COHORT_DB = DATA_DIR / "cohort.db"      # lolpros_accounts, soloq_baseline
