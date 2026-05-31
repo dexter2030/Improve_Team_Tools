@@ -19,6 +19,7 @@ from src.processing.soloq_aggregates import (
     RoleBreakdown,
     aggregate_champions,
     aggregate_roles,
+    filter_matches_by_champion,
 )
 
 
@@ -173,6 +174,20 @@ def test_role_breakdown_zero_games_win_rate():
 
 
 # ---------------------------------------------------------------------------
+# filter_matches_by_champion
+# ---------------------------------------------------------------------------
+
+def test_filter_matches_by_champion():
+    ms = [_ms(champion="Ahri"), _ms(champion="Yasuo"), _ms(champion="Ahri")]
+    out = filter_matches_by_champion(ms, "Ahri")
+    assert len(out) == 2
+    assert all(m.champion == "Ahri" for m in out)
+    assert filter_matches_by_champion(ms, "Zed") == []      # no games on it
+    assert filter_matches_by_champion([], "Ahri") == []     # empty input
+    print("PASS  test_filter_matches_by_champion")
+
+
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     test_aggregate_champions_empty()
@@ -188,4 +203,5 @@ if __name__ == "__main__":
     test_aggregate_roles_blank_and_none_bucket_unknown()
     test_aggregate_roles_win_rate()
     test_role_breakdown_zero_games_win_rate()
+    test_filter_matches_by_champion()
     print("\nAll tests passed.")
