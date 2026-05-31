@@ -35,7 +35,11 @@ from src.api.riot_client import (
 from src.cache.profile_store import ProfileStore
 from src.processing.comparison import (
     COMPARABLE_METRICS,
+    REGION_PLATFORMS,
     compare_to_cohort,
+    filter_by_platform,
+    platforms_for_region,
+    region_for_platform,
 )
 from src.processing.match_stats import (
     MatchStats,
@@ -267,7 +271,7 @@ def _fetch_and_render(
     # 5) Aggregate & render
     summary = aggregate_recent(per_match)
     _render_summary_section(summary)
-    _render_cohort_comparison(summary, per_match)
+    _render_cohort_comparison(summary, per_match, platform)
     _render_champion_section(aggregate_champions(per_match))
     _render_role_section(per_match)
     _render_match_table(per_match)
@@ -491,7 +495,7 @@ _ROLE_M5_TO_COHORT = {
 
 
 def _render_cohort_comparison(
-    summary: RecentPerformance, per_match: list[MatchStats],
+    summary: RecentPerformance, per_match: list[MatchStats], platform: str,
 ) -> None:
     """Porównanie do kohorty zbudowanej w zakładce Cohort Baseline."""
     st.markdown("### Compare against cohort")
@@ -505,7 +509,16 @@ def _render_cohort_comparison(
     for group in LEAGUE_GROUPS.values():
         all_leagues.extend(group)
 
-    c1, c2 = st.columns([3, 2])
+    # Dominująca rola gracza → odpowiadająca rola w kohorcie. Pozwalamy
+    # zmienić ręcznie (np. flex jungler scoutowany jako mid).
+    suggested_role = _dominant_role_label(per_match)
+    role_options = ["(any role)", "Top", "Jungle", "Mid", "Bot", "Support"]
+    default_role_idx = (
+        role_options.index(suggested_role)
+        if suggested_role in role_options else 0
+    )
+
+    c1, c2, c3 = st.columns([3, 2, 2])
     with c1:
         leagues = st.multiselect(
             "Cohort leagues",
@@ -517,19 +530,11 @@ def _render_cohort_comparison(
             help="Pick which leagues from the baseline to compare against. "
                  "All by default — restrict to one tier for tighter comparison.",
         )
-    # Dominująca rola gracza → odpowiadająca rola w kohorcie. Pozwalamy
-    # zmienić ręcznie (np. flex jungler scoutowany jako mid).
-    suggested_role = _dominant_role_label(per_match)
-    role_options = ["(any role)", "Top", "Jungle", "Mid", "Bot", "Support"]
-    default_idx = (
-        role_options.index(suggested_role)
-        if suggested_role in role_options else 0
-    )
     with c2:
         role = st.selectbox(
             "Role filter",
             options=role_options,
-            index=default_idx,
+            index=default_role_idx,
             help="Default: player's dominant role in this window.",
         )
 
@@ -541,9 +546,43 @@ def _render_cohort_comparison(
             "cohort first in the **Cohort Baseline** tab."
         )
         return
-    st.caption(f"Comparing against {len(rows)} cohort entries.")
 
-    results = compare_to_cohort(summary, rows)
+    # Region filter — meta KR vs EU różni się na tyle, że globalny Z-score
+    # myli. Domyślnie kohorta z regionu gracza (gdy są tam wpisy), inaczej
+    # globalna; coach może przełączyć.
+    region_options = ["Global (all regions)"] + list(REGION_PLATFORMS)
+    player_region = region_for_platform(platform)
+    default_region = "Global (all regions)"
+    if player_region and filter_by_platform(
+        rows, platforms_for_region(player_region)
+    ):
+        default_region = player_region
+    with c3:
+        region_choice = st.selectbox(
+            "Region (cohort)",
+            options=region_options,
+            index=region_options.index(default_region),
+            help="Compare against same-region peers — KR and EU SoloQ have "
+                 "different metas, so a cross-region Z-score is misleading. "
+                 "Defaults to the player's region when the cohort has it.",
+        )
+
+    platforms_arg = (
+        None if region_choice.startswith("Global")
+        else platforms_for_region(region_choice)
+    )
+    cohort_rows = filter_by_platform(rows, platforms_arg)
+    if not cohort_rows:
+        st.info(
+            f"No cohort entries from **{region_choice}** for that league/role. "
+            f"Switch to *Global* or build more of the cohort."
+        )
+        return
+    st.caption(
+        f"Comparing against {len(cohort_rows)} cohort entries · {region_choice}."
+    )
+
+    results = compare_to_cohort(summary, cohort_rows)
     df = pd.DataFrame([
         {
             "Metric":         r.label,

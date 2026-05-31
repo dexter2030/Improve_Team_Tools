@@ -18,6 +18,9 @@ from src.processing.comparison import (
     COMPARABLE_METRICS,
     build_cohort_stats,
     compare_to_cohort,
+    filter_by_platform,
+    platforms_for_region,
+    region_for_platform,
 )
 from src.processing.match_stats import RecentPerformance
 
@@ -164,6 +167,68 @@ def test_compare_empty_cohort():
 
 
 # ---------------------------------------------------------------------------
+# Per-region cohorts
+# ---------------------------------------------------------------------------
+
+def test_platforms_for_region():
+    assert platforms_for_region("KR") == frozenset({"kr"})
+    assert platforms_for_region("eu") == frozenset({"euw1", "eun1"})
+    assert platforms_for_region(" EU ") == frozenset({"euw1", "eun1"})
+    assert platforms_for_region("ZZ") == frozenset()
+    assert platforms_for_region("") == frozenset()
+    print("PASS  test_platforms_for_region")
+
+
+def test_region_for_platform():
+    assert region_for_platform("kr") == "KR"
+    assert region_for_platform("EUW1") == "EU"      # case-insensitive
+    assert region_for_platform("eun1") == "EU"
+    assert region_for_platform("la2") == "LATAM"
+    assert region_for_platform("xx") is None
+    assert region_for_platform("") is None
+    print("PASS  test_region_for_platform")
+
+
+def test_filter_by_platform():
+    rows = [
+        {"platform": "KR", "x": 1},          # upper-case in row
+        {"platform": "euw1", "x": 2},
+        {"x": 3},                            # missing platform
+    ]
+    assert len(filter_by_platform(rows, None)) == 3      # None → no filter
+    assert len(filter_by_platform(rows, [])) == 3        # empty → no filter
+    assert [r["x"] for r in filter_by_platform(rows, {"kr"})] == [1]   # case-insens
+    assert [r["x"] for r in filter_by_platform(rows, platforms_for_region("EU"))] == [2]
+    # rows missing 'platform' are dropped while a filter is active
+    kept = filter_by_platform(rows, {"kr", "euw1"})
+    assert [r["x"] for r in kept] == [1, 2]
+    print("PASS  test_filter_by_platform")
+
+
+def test_compare_to_cohort_per_region():
+    rows = [
+        {"platform": "kr",   "winrate": 0.80},
+        {"platform": "kr",   "winrate": 0.60},
+        {"platform": "euw1", "winrate": 0.40},
+        {"platform": "euw1", "winrate": 0.20},
+    ]
+    # KR-only cohort: winrate [0.8, 0.6], mean 0.70
+    kr = {r.metric: r for r in
+          compare_to_cohort(_perf(winrate=0.70), rows, platforms={"kr"})}["winrate"]
+    assert kr.cohort.n == 2
+    assert kr.cohort.mean == 0.70
+    assert kr.percentile == 50.0             # 1 of 2 KR values <= 0.70
+
+    # Whole cohort: winrate [.8,.6,.4,.2], mean 0.50
+    allr = {r.metric: r for r in
+            compare_to_cohort(_perf(winrate=0.70), rows)}["winrate"]
+    assert allr.cohort.n == 4
+    assert allr.cohort.mean == 0.50
+    assert allr.percentile == 75.0           # 3 of 4 values <= 0.70
+    print("PASS  test_compare_to_cohort_per_region")
+
+
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     test_build_cohort_stats_distribution()
@@ -177,4 +242,8 @@ if __name__ == "__main__":
     test_compare_zero_std_gives_no_z_but_keeps_percentile()
     test_compare_missing_player_value()
     test_compare_empty_cohort()
+    test_platforms_for_region()
+    test_region_for_platform()
+    test_filter_by_platform()
+    test_compare_to_cohort_per_region()
     print("\nAll tests passed.")
