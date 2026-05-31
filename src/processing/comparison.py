@@ -105,6 +105,22 @@ def region_for_platform(platform: str) -> str | None:
     return None
 
 
+def z_score_sentiment(
+    higher_is_better: bool | None, z_score: float | None,
+) -> str:
+    """Classify a Z-score as 'good' / 'bad' / 'neutral' for colouring.
+
+    Direction-aware: for a higher-is-better metric a positive Z is 'good';
+    for a lower-is-better metric it's the opposite. Metrics with no defined
+    direction (higher_is_better is None, e.g. damage taken) — and a None
+    Z-score — are 'neutral'. Used by the SoloQ comparison bar chart.
+    """
+    if higher_is_better is None or z_score is None:
+        return "neutral"
+    good = (z_score >= 0) if higher_is_better else (z_score <= 0)
+    return "good" if good else "bad"
+
+
 @dataclass(frozen=True, slots=True)
 class CohortMetricStats:
     """Rozkład jednej metryki w kohorcie."""

@@ -21,6 +21,7 @@ from src.processing.comparison import (
     filter_by_platform,
     platforms_for_region,
     region_for_platform,
+    z_score_sentiment,
 )
 from src.processing.match_stats import RecentPerformance
 
@@ -228,6 +229,17 @@ def test_compare_to_cohort_per_region():
     print("PASS  test_compare_to_cohort_per_region")
 
 
+def test_z_score_sentiment():
+    assert z_score_sentiment(True, 1.5) == "good"
+    assert z_score_sentiment(True, -1.5) == "bad"
+    assert z_score_sentiment(True, 0.0) == "good"      # tie counts as good
+    assert z_score_sentiment(False, -1.0) == "good"    # lower-is-better metric
+    assert z_score_sentiment(False, 1.0) == "bad"
+    assert z_score_sentiment(None, 2.0) == "neutral"   # no defined direction
+    assert z_score_sentiment(True, None) == "neutral"  # nothing to colour
+    print("PASS  test_z_score_sentiment")
+
+
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -246,4 +258,5 @@ if __name__ == "__main__":
     test_region_for_platform()
     test_filter_by_platform()
     test_compare_to_cohort_per_region()
+    test_z_score_sentiment()
     print("\nAll tests passed.")

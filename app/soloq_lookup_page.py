@@ -22,6 +22,7 @@ ją jak inne strony.
 
 from __future__ import annotations
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -40,6 +41,7 @@ from src.processing.comparison import (
     filter_by_platform,
     platforms_for_region,
     region_for_platform,
+    z_score_sentiment,
 )
 from src.processing.match_stats import (
     MatchStats,
@@ -610,6 +612,11 @@ def _render_cohort_comparison(
     )
 
     results = compare_to_cohort(player_summary, cohort_rows)
+
+    # Diverging bar chart Z-score — szybki skan mocnych/słabych stron przed
+    # szczegółową tabelą.
+    _render_zscore_chart(results)
+
     df = pd.DataFrame([
         {
             "Metric":         r.label,
@@ -648,6 +655,54 @@ def _render_cohort_comparison(
 
     styled = df.style.map(_color_z, subset=["Z-score"])
     st.dataframe(styled, use_container_width=True, hide_index=True)
+
+
+def _render_zscore_chart(results: list) -> None:
+    """Poziomy diverging bar chart Z-score per metryka.
+
+    Zielone w prawo = powyżej średniej kohorty (lepiej), czerwone w lewo =
+    poniżej; szary = metryka bez kierunku (np. dmg taken). Metryki bez
+    Z-score (brak danych / std=0) są pomijane. Szybsze do skanowania niż
+    tabela poniżej.
+    """
+    chart_rows = [
+        {
+            "Metric": r.label,
+            "Z": r.z_score,
+            "cat": z_score_sentiment(r.higher_is_better, r.z_score),
+        }
+        for r in results if r.z_score is not None
+    ]
+    if not chart_rows:
+        return
+    cdf = pd.DataFrame(chart_rows)
+    bars = (
+        alt.Chart(cdf)
+        .mark_bar()
+        .encode(
+            x=alt.X("Z:Q", title="Z-score (σ od średniej kohorty)"),
+            y=alt.Y("Metric:N", sort="-x", title=None),
+            color=alt.Color(
+                "cat:N",
+                scale=alt.Scale(
+                    domain=["good", "bad", "neutral"],
+                    range=["#2e7d32", "#c62828", "#9e9e9e"],
+                ),
+                legend=None,
+            ),
+            tooltip=[
+                alt.Tooltip("Metric:N", title="Metric"),
+                alt.Tooltip("Z:Q", title="Z-score", format="+.2f"),
+            ],
+        )
+        .properties(height=max(26 * len(chart_rows), 140))
+    )
+    zero = (
+        alt.Chart(pd.DataFrame({"x": [0]}))
+        .mark_rule(color="#888", strokeDash=[4, 4])
+        .encode(x="x:Q")
+    )
+    st.altair_chart(bars + zero, use_container_width=True)
 
 
 def _dominant_role_label(per_match: list[MatchStats]) -> str:
