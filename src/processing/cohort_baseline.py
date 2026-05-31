@@ -120,6 +120,7 @@ def compute_account_baseline(
         match_ids = riot_client.fetch_all_match_ids_since(
             account.puuid, platform,
             since_epoch=since_epoch, queue=queue, hard_cap=max_matches,
+            archival=True,
         )
     except Exception as exc:
         return BaselineOutcome("error", None, f"match_ids: {exc}", 0)

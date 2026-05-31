@@ -212,6 +212,18 @@ def scrape_lolpros_accounts(
             region=region_raw,
             platform=platform,
         ))
+
+    if not out:
+        # Plan B z TODO: 0 kont to najczęściej dryf schematu lolpros.
+        # Logujemy strukturalną podpowiedź (klucze pageProps), żeby dało się
+        # dopasować parser bez zgadywania — bez zrzucania całego NEXT_DATA.
+        logger.warning(
+            "lolpros: 0 użytecznych kont z %s (raw_accounts=%d). "
+            "Schemat mógł się zmienić; klucze pageProps=[%s]",
+            lolpros_url,
+            len(raw_accounts) if isinstance(raw_accounts, list) else -1,
+            _debug_keys(_deep_first(data, "pageProps")),
+        )
     return out
 
 
@@ -227,6 +239,17 @@ def _extract_next_data(html: str) -> dict:
     if not m:
         raise ValueError("Brak __NEXT_DATA__ w HTML")
     return json.loads(m.group(1))
+
+
+def _debug_keys(obj) -> str:
+    """Ograniczona podpowiedź strukturalna do logów: klucze dicta albo typ.
+
+    Używane gdy parser nie znalazł kont — pokazuje, gdzie lolpros przeniósł
+    dane, bez logowania całego (dużego) NEXT_DATA.
+    """
+    if isinstance(obj, dict):
+        return ", ".join(sorted(obj.keys())[:25])
+    return type(obj).__name__
 
 
 def _deep_first(obj, key: str):

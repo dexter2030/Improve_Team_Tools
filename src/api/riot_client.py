@@ -192,14 +192,18 @@ class RankedEntry:
 # Summoner level only ever drifts upward, so a day-stale value is harmless.
 # Ranked LP/tier shifts within hours during play, so one hour is a safe cap.
 # Match payloads and timelines are immutable once a game ends — cache long.
-# Match-id lists for a player must stay short-lived (new games keep arriving).
+# Match-id lists for a player must stay short-lived (new games keep arriving)
+# for the live lookup path; a season-bounded list (start_time fixed) only
+# grows, so a batch baseline rebuild opts into the longer ARCHIVE TTL to reuse
+# the paginated list across a multi-hour run instead of re-paging every 15 min.
 
-_ACCOUNT_CACHE_TTL    = 30 * 24 * 3600   # 30 days
-_SUMMONER_CACHE_TTL   = 24 * 3600        # 24 hours
-_RANKED_CACHE_TTL     =      3600        # 1 hour
-_MATCH_IDS_CACHE_TTL  =      900         # 15 minutes
-_MATCH_CACHE_TTL      = 30 * 24 * 3600   # 30 days (immutable post-game)
-_TIMELINE_CACHE_TTL   = 30 * 24 * 3600   # 30 days (immutable post-game)
+_ACCOUNT_CACHE_TTL     = 30 * 24 * 3600  # 30 days
+_SUMMONER_CACHE_TTL    = 24 * 3600       # 24 hours
+_RANKED_CACHE_TTL      =      3600       # 1 hour
+_MATCH_IDS_CACHE_TTL   =      900        # 15 minutes (recent list shifts)
+_MATCH_IDS_ARCHIVE_TTL = 24 * 3600       # 24 hours (baseline rebuild reuse)
+_MATCH_CACHE_TTL       = 30 * 24 * 3600  # 30 days (immutable post-game)
+_TIMELINE_CACHE_TTL    = 30 * 24 * 3600  # 30 days (immutable post-game)
 
 
 # --- The client --------------------------------------------------------------
@@ -307,6 +311,7 @@ class RiotClient:
         queue: int = 420,
         start: int = 0,
         start_time: int | None = None,
+        cache_ttl: int | None = None,
     ) -> list[str]:
         """Return recent match IDs for a player (Match-V5 by-puuid/ids).
 
@@ -322,6 +327,9 @@ class RiotClient:
             start_time: epoch seconds — only matches AFTER this point are
                         returned. Required when scoping to a season; without
                         it Riot returns the player's all-time history.
+            cache_ttl:  seconds to cache this page; None uses the short default
+                        (_MATCH_IDS_CACHE_TTL). A season-bounded list is stable,
+                        so the baseline path passes a longer TTL.
 
         Returns: list of match IDs, newest first. Empty list when the
         player has no matching games in the window.
@@ -350,7 +358,10 @@ class RiotClient:
             else:
                 raise
         ids = list(ids or [])
-        self._cache_set(key, ids, _MATCH_IDS_CACHE_TTL)
+        self._cache_set(
+            key, ids,
+            cache_ttl if cache_ttl is not None else _MATCH_IDS_CACHE_TTL,
+        )
         return ids
 
     def fetch_all_match_ids_since(
@@ -362,6 +373,7 @@ class RiotClient:
         queue: int = 420,
         page_size: int = 100,
         hard_cap: int = 1000,
+        archival: bool = False,
     ) -> list[str]:
         """Paginate `fetch_match_ids` to get every match ID after `since_epoch`.
 
@@ -369,7 +381,12 @@ class RiotClient:
         `start` offset. We keep paging until a short page comes back or
         `hard_cap` IDs collected — the latter guards against runaway loops
         if Riot's `start_time` filter were ever ignored.
+
+        `archival=True` caches each page with the longer _MATCH_IDS_ARCHIVE_TTL
+        instead of the short default — for a baseline rebuild over a fixed
+        season cutoff, where the list is stable enough to reuse across a run.
         """
+        page_ttl = _MATCH_IDS_ARCHIVE_TTL if archival else None
         out: list[str] = []
         start = 0
         while True:
@@ -377,6 +394,7 @@ class RiotClient:
                 puuid, platform,
                 count=page_size, queue=queue,
                 start=start, start_time=since_epoch,
+                cache_ttl=page_ttl,
             )
             if not batch:
                 break
