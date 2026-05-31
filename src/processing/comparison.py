@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Iterable, Sequence
 
 from src.processing.match_stats import RecentPerformance
 
@@ -42,6 +42,83 @@ COMPARABLE_METRICS: list[tuple[str, str, bool | None]] = [
     ("solo_kills",           "Solo kills",     True),
     ("first_blood_rate",     "FB rate",        True),
 ]
+
+
+# --- Region grouping --------------------------------------------------------
+# Which Riot platform routing values make up a scouting "region". A region's
+# SoloQ meta (CS/min, gold/min, ...) differs enough that a cross-region
+# Z-score is misleading — restrict the cohort to one region to compare like
+# with like. Keys are the labels a coach picks in the UI.
+REGION_PLATFORMS: dict[str, frozenset[str]] = {
+    "EU":    frozenset({"euw1", "eun1"}),
+    "KR":    frozenset({"kr"}),
+    "NA":    frozenset({"na1"}),
+    "BR":    frozenset({"br1"}),
+    "LATAM": frozenset({"la1", "la2"}),
+    "TR":    frozenset({"tr1"}),
+    "OCE":   frozenset({"oc1"}),
+    "JP":    frozenset({"jp1"}),
+    "RU":    frozenset({"ru"}),
+}
+
+
+def platforms_for_region(region: str) -> frozenset[str]:
+    """Riot platforms that make up a scouting region (case-insensitive).
+
+    Unknown / empty region → empty set, which `filter_by_platform` treats as
+    'no filter'. Callers that need 'no match' semantics should special-case
+    the empty result.
+    """
+    return REGION_PLATFORMS.get((region or "").strip().upper(), frozenset())
+
+
+def filter_by_platform(
+    baseline_rows: Sequence[dict],
+    platforms: Iterable[str] | None,
+) -> list[dict]:
+    """Keep only baseline rows whose `platform` is in `platforms`.
+
+    `platforms` None or empty → all rows (the global cohort). Matching is
+    case-insensitive on each row's 'platform' key; rows missing it are
+    dropped while a filter is active.
+    """
+    if not platforms:
+        return list(baseline_rows)
+    wanted = {str(p).strip().lower() for p in platforms}
+    return [
+        r for r in baseline_rows
+        if str(r.get("platform", "")).strip().lower() in wanted
+    ]
+
+
+def region_for_platform(platform: str) -> str | None:
+    """Inverse of REGION_PLATFORMS: which scouting region a platform is in.
+
+    Returns None for unknown/empty platforms. Each platform belongs to at
+    most one region, so the first match wins. Used to default the cohort to
+    the scouted player's own region.
+    """
+    p = (platform or "").strip().lower()
+    for region, plats in REGION_PLATFORMS.items():
+        if p in plats:
+            return region
+    return None
+
+
+def z_score_sentiment(
+    higher_is_better: bool | None, z_score: float | None,
+) -> str:
+    """Classify a Z-score as 'good' / 'bad' / 'neutral' for colouring.
+
+    Direction-aware: for a higher-is-better metric a positive Z is 'good';
+    for a lower-is-better metric it's the opposite. Metrics with no defined
+    direction (higher_is_better is None, e.g. damage taken) — and a None
+    Z-score — are 'neutral'. Used by the SoloQ comparison bar chart.
+    """
+    if higher_is_better is None or z_score is None:
+        return "neutral"
+    good = (z_score >= 0) if higher_is_better else (z_score <= 0)
+    return "good" if good else "bad"
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,19 +169,27 @@ def build_cohort_stats(
 def compare_to_cohort(
     perf: RecentPerformance,
     baseline_rows: Sequence[dict],
+    *,
+    platforms: Iterable[str] | None = None,
 ) -> list[ComparisonResult]:
     """Porównuje `perf` do rozkładu kohorty `baseline_rows`.
 
     Zwraca po jednym ComparisonResult na metrykę z COMPARABLE_METRICS
     (kolejność zachowana). Brak danych w kohorcie ALBO u gracza →
     percentile=None, z_score=None (UI pokazuje wtedy „—").
+
+    `platforms` zawęża kohortę do podanych platform Riot (np. {'euw1','eun1'}
+    dla EU), żeby Z-score/percentyl liczyć względem graczy z tego samego
+    regionu — meta KR vs EU różni się na tyle, że globalny Z-score myli.
+    None = porównanie do całej kohorty.
     """
-    cohort = build_cohort_stats(baseline_rows)
+    rows = filter_by_platform(baseline_rows, platforms)
+    cohort = build_cohort_stats(rows)
     out: list[ComparisonResult] = []
     for key, label, higher in COMPARABLE_METRICS:
         stats = cohort[key]
         player_value = getattr(perf, key, None)
-        percentile = _percentile_of(player_value, baseline_rows, key)
+        percentile = _percentile_of(player_value, rows, key)
         z_score = _z_score(player_value, stats)
         out.append(ComparisonResult(
             metric=key,

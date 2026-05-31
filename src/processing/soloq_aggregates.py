@@ -130,3 +130,15 @@ def aggregate_roles(stats: Sequence[MatchStats]) -> list[RoleBreakdown]:
     ]
     result.sort(key=lambda r: (-r.games, r.role))
     return result
+
+
+def filter_matches_by_champion(
+    matches: Sequence[MatchStats], champion: str,
+) -> list[MatchStats]:
+    """Subset of `matches` played on `champion` (exact championName match).
+
+    Lets the SoloQ comparison restrict a player's window to one champion so
+    off-champion games don't skew the averages (a mid main's pocket picks
+    shouldn't muddy their signature-champion read).
+    """
+    return [m for m in matches if m.champion == champion]

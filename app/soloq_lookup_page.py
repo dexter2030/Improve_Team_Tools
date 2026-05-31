@@ -22,6 +22,7 @@ ją jak inne strony.
 
 from __future__ import annotations
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -35,7 +36,12 @@ from src.api.riot_client import (
 from src.cache.profile_store import ProfileStore
 from src.processing.comparison import (
     COMPARABLE_METRICS,
+    REGION_PLATFORMS,
     compare_to_cohort,
+    filter_by_platform,
+    platforms_for_region,
+    region_for_platform,
+    z_score_sentiment,
 )
 from src.processing.match_stats import (
     MatchStats,
@@ -47,6 +53,7 @@ from src.processing.soloq_aggregates import (
     SoloQChampionStat,
     aggregate_champions,
     aggregate_roles,
+    filter_matches_by_champion,
 )
 
 
@@ -267,7 +274,7 @@ def _fetch_and_render(
     # 5) Aggregate & render
     summary = aggregate_recent(per_match)
     _render_summary_section(summary)
-    _render_cohort_comparison(summary, per_match)
+    _render_cohort_comparison(summary, per_match, platform)
     _render_champion_section(aggregate_champions(per_match))
     _render_role_section(per_match)
     _render_match_table(per_match)
@@ -491,7 +498,7 @@ _ROLE_M5_TO_COHORT = {
 
 
 def _render_cohort_comparison(
-    summary: RecentPerformance, per_match: list[MatchStats],
+    summary: RecentPerformance, per_match: list[MatchStats], platform: str,
 ) -> None:
     """Porównanie do kohorty zbudowanej w zakładce Cohort Baseline."""
     st.markdown("### Compare against cohort")
@@ -505,7 +512,16 @@ def _render_cohort_comparison(
     for group in LEAGUE_GROUPS.values():
         all_leagues.extend(group)
 
-    c1, c2 = st.columns([3, 2])
+    # Dominująca rola gracza → odpowiadająca rola w kohorcie. Pozwalamy
+    # zmienić ręcznie (np. flex jungler scoutowany jako mid).
+    suggested_role = _dominant_role_label(per_match)
+    role_options = ["(any role)", "Top", "Jungle", "Mid", "Bot", "Support"]
+    default_role_idx = (
+        role_options.index(suggested_role)
+        if suggested_role in role_options else 0
+    )
+
+    c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
     with c1:
         leagues = st.multiselect(
             "Cohort leagues",
@@ -517,19 +533,11 @@ def _render_cohort_comparison(
             help="Pick which leagues from the baseline to compare against. "
                  "All by default — restrict to one tier for tighter comparison.",
         )
-    # Dominująca rola gracza → odpowiadająca rola w kohorcie. Pozwalamy
-    # zmienić ręcznie (np. flex jungler scoutowany jako mid).
-    suggested_role = _dominant_role_label(per_match)
-    role_options = ["(any role)", "Top", "Jungle", "Mid", "Bot", "Support"]
-    default_idx = (
-        role_options.index(suggested_role)
-        if suggested_role in role_options else 0
-    )
     with c2:
         role = st.selectbox(
             "Role filter",
             options=role_options,
-            index=default_idx,
+            index=default_role_idx,
             help="Default: player's dominant role in this window.",
         )
 
@@ -541,9 +549,74 @@ def _render_cohort_comparison(
             "cohort first in the **Cohort Baseline** tab."
         )
         return
-    st.caption(f"Comparing against {len(rows)} cohort entries.")
 
-    results = compare_to_cohort(summary, rows)
+    # Region filter — meta KR vs EU różni się na tyle, że globalny Z-score
+    # myli. Domyślnie kohorta z regionu gracza (gdy są tam wpisy), inaczej
+    # globalna; coach może przełączyć.
+    region_options = ["Global (all regions)"] + list(REGION_PLATFORMS)
+    player_region = region_for_platform(platform)
+    default_region = "Global (all regions)"
+    if player_region and filter_by_platform(
+        rows, platforms_for_region(player_region)
+    ):
+        default_region = player_region
+    with c3:
+        region_choice = st.selectbox(
+            "Region (cohort)",
+            options=region_options,
+            index=region_options.index(default_region),
+            help="Compare against same-region peers — KR and EU SoloQ have "
+                 "different metas, so a cross-region Z-score is misleading. "
+                 "Defaults to the player's region when the cohort has it.",
+        )
+
+    platforms_arg = (
+        None if region_choice.startswith("Global")
+        else platforms_for_region(region_choice)
+    )
+    cohort_rows = filter_by_platform(rows, platforms_arg)
+    if not cohort_rows:
+        st.info(
+            f"No cohort entries from **{region_choice}** for that league/role. "
+            f"Switch to *Global* or build more of the cohort."
+        )
+        return
+    # Champion filter (player side). Baseline trzyma agregaty per-konto, bez
+    # rozbicia na championy — więc kohorta zostaje na poziomie roli/regionu,
+    # a filtr championa zawęża TYLKO okno gracza (np. do jego maina), żeby
+    # gry off-champion nie zaszumiały jego liczb.
+    champ_options = ["All champions"] + [
+        c.champion for c in aggregate_champions(per_match)
+    ]
+    with c4:
+        champ_choice = st.selectbox(
+            "Champion (player)",
+            options=champ_options,
+            index=0,
+            help="Restrict the player's window to one champion (e.g. their "
+                 "main) so off-champion games don't muddy the averages. The "
+                 "cohort stays role/region-level — the baseline has no "
+                 "per-champion breakdown yet.",
+        )
+
+    if champ_choice == "All champions":
+        player_summary = summary
+    else:
+        player_summary = aggregate_recent(
+            filter_matches_by_champion(per_match, champ_choice)
+        )
+
+    st.caption(
+        f"Comparing **{champ_choice}** ({player_summary.games} games) against "
+        f"{len(cohort_rows)} cohort entries · {region_choice}."
+    )
+
+    results = compare_to_cohort(player_summary, cohort_rows)
+
+    # Diverging bar chart Z-score — szybki skan mocnych/słabych stron przed
+    # szczegółową tabelą.
+    _render_zscore_chart(results)
+
     df = pd.DataFrame([
         {
             "Metric":         r.label,
@@ -582,6 +655,54 @@ def _render_cohort_comparison(
 
     styled = df.style.map(_color_z, subset=["Z-score"])
     st.dataframe(styled, use_container_width=True, hide_index=True)
+
+
+def _render_zscore_chart(results: list) -> None:
+    """Poziomy diverging bar chart Z-score per metryka.
+
+    Zielone w prawo = powyżej średniej kohorty (lepiej), czerwone w lewo =
+    poniżej; szary = metryka bez kierunku (np. dmg taken). Metryki bez
+    Z-score (brak danych / std=0) są pomijane. Szybsze do skanowania niż
+    tabela poniżej.
+    """
+    chart_rows = [
+        {
+            "Metric": r.label,
+            "Z": r.z_score,
+            "cat": z_score_sentiment(r.higher_is_better, r.z_score),
+        }
+        for r in results if r.z_score is not None
+    ]
+    if not chart_rows:
+        return
+    cdf = pd.DataFrame(chart_rows)
+    bars = (
+        alt.Chart(cdf)
+        .mark_bar()
+        .encode(
+            x=alt.X("Z:Q", title="Z-score (σ od średniej kohorty)"),
+            y=alt.Y("Metric:N", sort="-x", title=None),
+            color=alt.Color(
+                "cat:N",
+                scale=alt.Scale(
+                    domain=["good", "bad", "neutral"],
+                    range=["#2e7d32", "#c62828", "#9e9e9e"],
+                ),
+                legend=None,
+            ),
+            tooltip=[
+                alt.Tooltip("Metric:N", title="Metric"),
+                alt.Tooltip("Z:Q", title="Z-score", format="+.2f"),
+            ],
+        )
+        .properties(height=max(26 * len(chart_rows), 140))
+    )
+    zero = (
+        alt.Chart(pd.DataFrame({"x": [0]}))
+        .mark_rule(color="#888", strokeDash=[4, 4])
+        .encode(x="x:Q")
+    )
+    st.altair_chart(bars + zero, use_container_width=True)
 
 
 def _dominant_role_label(per_match: list[MatchStats]) -> str:
