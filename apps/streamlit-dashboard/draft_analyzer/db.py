@@ -15,9 +15,12 @@ from pathlib import Path
 
 import streamlit as st
 
+from src.paths import DRAFTS_DB
 from .leagues import more_specific
 
-DB_PATH = Path(__file__).parent / "drafts.db"
+# Ścieżka bazy draftów (+ gracze + kohorta na tym etapie). Scentralizowana
+# w src/paths.py (data/). P3 rozdzieli to na drafts/players/cohort.
+DB_PATH = DRAFTS_DB
 
 # TTL dla cache'u odczytów (sekundy). Streamlit rerunuje stronę przy każdej
 # interakcji widżetu (klik w patch multiselect, zmiana checkboxa, ...), a

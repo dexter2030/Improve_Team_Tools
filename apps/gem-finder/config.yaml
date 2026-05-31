@@ -28,5 +28,7 @@ http:
   lolpros_delay_seconds: 1.5
 
 paths:
-  database: scouting.db
-  log: scout.log
+  # Ścieżka względna jest rozwijana względem katalogu aplikacji (apps/gem-finder)
+  # w scouting/config.py; można nadpisać zmienną GEM_FINDER_DB.
+  database: data/gem_finder.db
+  log: data/scout.log

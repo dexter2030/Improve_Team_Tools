@@ -38,6 +38,7 @@ from shared.api.leaguepedia_client import LeaguepediaClient, ScoreboardRow
 from shared.api.riot_client import RankedEntry, RiotClient, SqliteCacheStore
 from src.processing.champion_stats import ChampionStat, aggregate_champion_stats
 from src.cache.profile_store import ProfileStore
+from src.paths import SCOUTING_DB
 from src.processing.links import parse_leaguepedia_url, parse_opgg_url
 from src.processing.profiles import (
     ProPlayIdentity,
@@ -60,7 +61,8 @@ from app.auth import require_password
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-DB_PATH = PROJECT_ROOT / "scouting.db"
+# Ścieżka bazy profili + cache API. Scentralizowana w src/paths.py (data/).
+DB_PATH = SCOUTING_DB
 
 
 def _app_version() -> str:
