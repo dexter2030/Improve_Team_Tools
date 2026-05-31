@@ -1,4 +1,4 @@
-"""lolpros.gg — best-effort match graczy do ich kont soloQ.
+"""lolpros.gg — best-effort match graczy do ich kont soloQ (wariant Gem-finder).
 
 Strategia:
 1) GET https://lolpros.gg/player/<slug>
@@ -8,6 +8,19 @@ Strategia:
    miss/fail.
 
 Sekwencyjnie, throttle min 1.5s między requestami (konfig).
+
+UWAGA — to NIE jest przypadkowy duplikat ``packages/shared/shared/lolpros.py``;
+oba parsują __NEXT_DATA__, ale różnice są CELOWE i ten moduł zostaje osobno:
+  * pokrycie regionów — pipeline Gem-findera (``soloq.REGION_ALIASES``) obsługuje
+    14 regionów (m.in. JP/PH/SG/TH/TW/VN); ``shared`` mapuje tylko 11 i ODRZUCA
+    pozostałe, więc delegacja zgubiłaby konta z tych regionów;
+  * ekstrakcja — tu przechodzimy CAŁE drzewo (``_walk_for_accounts``, odporne na
+    dryf schematu); ``shared`` bierze tylko klucz „accounts";
+  * kształt wyniku — zwracamy ``{riot_id, tag, region}`` (region = krótki kod,
+    mapowany dalej w ``soloq.py``), a ``shared`` zwraca ``LolprosAccount`` z
+    gotowym ``platform``.
+Naprawdę współdzielony kod (klienci Riot/Leaguepedia, ``match_stats``) mieszka w
+``packages/shared``; tutaj zostaje wyłącznie warstwa specyficzna dla pipeline'u.
 """
 from __future__ import annotations
 
