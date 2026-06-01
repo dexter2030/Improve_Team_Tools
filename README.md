@@ -2,17 +2,22 @@
 
 LoL Scouting Dashboard — Next.js + Supabase + Vercel.
 
-Repo zawiera dwie wersje aplikacji:
+Monorepo: `apps/` (samodzielne aplikacje) + `packages/` (wspólny kod Pythona).
 
-- **`web/`** — aktywna, Next.js 16 + TypeScript + Tailwind + Drizzle ORM.
-  Production-ready. Deploy: zobacz [`web/DEPLOY.md`](web/DEPLOY.md).
-- **`app/` + `src/` + `draft_analyzer/`** — legacy Streamlit MVP (Python).
-  Trzymane jako referencja podczas migracji; nowa rozbudowa idzie w `web/`.
+- **`apps/web/`** — aktywna, Next.js 16 + TypeScript + Tailwind + Drizzle ORM.
+  Production-ready. Deploy: zobacz [`apps/web/DEPLOY.md`](apps/web/DEPLOY.md).
+- **`apps/streamlit-dashboard/`** — Streamlit MVP (Python): `app/` (UI) +
+  `src/` (domena) + `draft_analyzer/` (drafty/gracze/kohorta) + `tests/`.
+  Bazy per domena w `data/` (profiles/cache/drafts/players/cohort.db).
+- **`apps/gem-finder/`** — pipeline CLI (Leaguepedia→lolpros→Riot→SQLite)
+  + `hidden_gems/` (warstwa scoringu Hidden Gem Score).
+- **`packages/shared/`** — wspólny kod Pythona (klienci Riot/Leaguepedia,
+  scraper lolpros, `match_stats`), importowany jako `shared.*`.
 
 ## Setup lokalny (web/)
 
 ```bash
-cd web
+cd apps/web
 npm install
 cp .env.local.example .env.local
 # uzupełnij DATABASE_URL, RIOT_API_KEY, APP_PASSWORD itp.
@@ -38,7 +43,7 @@ npm run dev                # http://localhost:3000
 ## Architektura
 
 ```
-web/src/
+apps/web/src/
 ├── app/                 # Next.js App Router
 │   ├── (dashboard)/     # route group za auth, z sidebarem
 │   ├── api/             # route handlers (health, auth)
@@ -54,13 +59,21 @@ web/src/
     └── players/         # global Leaguepedia Players sync
 ```
 
-## Legacy Streamlit (do referencji)
+## Streamlit dashboard (Python)
 
 ```
+cd apps/streamlit-dashboard
 pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
-Streamlit MVP używa SQLite (`scouting.db`, `drafts.db`) lokalnie i tych
-samych źródeł danych. Migracja → Next.js trwa, ale Streamlit dalej
-działa równolegle dopóki nie zwinie się do `legacy/`.
+Bazy SQLite per domena w `apps/streamlit-dashboard/data/`
+(`profiles.db` / `cache.db` / `drafts.db` / `players.db` / `cohort.db`).
+Jednorazowa migracja ze starego układu (`scouting.db` + `drafts.db`):
+
+```
+python scripts/migrate_dbs.py
+```
+
+Gem-finder (pipeline CLI): `cd apps/gem-finder && python -m scouting.pipeline`
+(wymaga `pip install -r requirements.txt` w tym katalogu — m.in. `tqdm`).

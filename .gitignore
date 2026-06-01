@@ -1,6 +1,13 @@
 .env
-.streamlit/secrets.toml
+# secrets.toml w dowolnej aplikacji (po podziale na apps/* katalog .streamlit
+# nie jest już tylko w roocie).
+**/.streamlit/secrets.toml
 *.db
+# pliki dziennika WAL/shm SQLite (gdyby któraś baza używała trybu WAL)
+*.db-wal
+*.db-shm
+# log pipeline'u Gem-finder (apps/gem-finder/data/scout.log)
+scout.log
 __pycache__/
 *.pyc
 .venv/
