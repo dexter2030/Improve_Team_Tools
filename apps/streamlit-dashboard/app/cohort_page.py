@@ -28,9 +28,9 @@ import streamlit as st
 
 from draft_analyzer.db import (
     accounts_needing_baseline,
+    count_all_lolpros_accounts,
     count_lolpros_scraped,
     count_soloq_baseline_for_cutoff,
-    fetch_all_lolpros_accounts,
     fetch_soloq_baseline,
     init_db,
     players_needing_lolpros_scrape,
@@ -139,7 +139,7 @@ def _section_scrape_lolpros(leagues: list[str]) -> None:
     pending_filtered = _filter_by_league(pending, leagues)
 
     scraped = count_lolpros_scraped()
-    accounts_total = len(fetch_all_lolpros_accounts())
+    accounts_total = count_all_lolpros_accounts()
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Players scraped", scraped)
@@ -228,7 +228,7 @@ def _section_compute_baseline(
 
     pending = accounts_needing_baseline(cutoff_epoch)
     have_baseline = count_soloq_baseline_for_cutoff(cutoff_epoch)
-    total_accounts = len(fetch_all_lolpros_accounts())
+    total_accounts = count_all_lolpros_accounts()
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Accounts in DB", total_accounts)

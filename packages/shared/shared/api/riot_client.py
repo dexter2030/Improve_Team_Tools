@@ -101,7 +101,10 @@ class SqliteCacheStore:
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
-        conn = sqlite3.connect(self._db_path)
+        # timeout=5s == busy_timeout: gdy wiele wątków pisze do cache
+        # równocześnie (np. równoległe pobieranie meczów w cohort baseline),
+        # SQLite czeka na zwolnienie locka zamiast rzucać „database is locked".
+        conn = sqlite3.connect(self._db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
         try:
             yield conn

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Callable
 
@@ -36,6 +37,11 @@ DEFAULT_MIN_SEASON_GAMES = 100
 # Hard cap na liczbę meczy / konto — chroni przed kontami z 1000+ gier,
 # które wyssałyby rate-limit. 200 to z naddatkiem ponad próg 100.
 DEFAULT_MAX_MATCHES = 200
+
+# Ile meczów pobierać równolegle. Pobieranie to operacja I/O-bound (Riot API,
+# 1-2 calle na mecz), więc pula wątków daje duże przyspieszenie; umiarkowana
+# wartość, żeby nie przeciążyć rate-limitu riotwatchera.
+_FETCH_WORKERS = 6
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,10 +133,14 @@ def compute_account_baseline(
     if not match_ids:
         return BaselineOutcome("no_matches", None, None, 0)
 
-    # 4) Per-match fetch + reduce.
-    per_match: list[MatchStats] = []
-    total = len(match_ids)
-    for i, mid in enumerate(match_ids):
+    # 4) Per-match fetch (równolegle) + reduce (sekwencyjnie, główny wątek).
+    # Pobieranie to bottleneck I/O — 1-2 calle na mecz, do 200 meczy na konto.
+    # Fetch idzie w puli wątków; compute_match_stats i on_match zostają na
+    # głównym wątku (Streamlit nie jest thread-safe), a pool.map zachowuje
+    # kolejność wejścia, więc pasek postępu rośnie monotonicznie, a wynik jest
+    # identyczny jak przy pętli sekwencyjnej (aggregate_recent i tak jest
+    # niezależne od kolejności).
+    def _fetch(mid: str) -> tuple[dict | None, dict | None]:
         try:
             match = riot_client.fetch_match(mid, platform)
         except Exception:
@@ -141,12 +151,18 @@ def compute_account_baseline(
                 timeline = riot_client.fetch_match_timeline(mid, platform)
             except Exception:
                 timeline = None
-        if match:
-            stats = compute_match_stats(match, timeline, account.puuid)
-            if stats is not None:
-                per_match.append(stats)
-        if on_match is not None:
-            on_match(i + 1, total)
+        return match, timeline
+
+    per_match: list[MatchStats] = []
+    total = len(match_ids)
+    with ThreadPoolExecutor(max_workers=min(_FETCH_WORKERS, total)) as pool:
+        for i, (match, timeline) in enumerate(pool.map(_fetch, match_ids)):
+            if match:
+                stats = compute_match_stats(match, timeline, account.puuid)
+                if stats is not None:
+                    per_match.append(stats)
+            if on_match is not None:
+                on_match(i + 1, total)
 
     if not per_match:
         return BaselineOutcome("no_matches", None, None, 0)

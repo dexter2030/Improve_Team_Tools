@@ -796,22 +796,24 @@ def upsert_lolpros_accounts(
                 (overview_page, now, scrape_error or ""),
             )
             return
-        for acc in accounts:
-            conn.execute(
-                """
-                INSERT INTO lolpros_accounts (
-                    overview_page, game_name, tag_line, region, platform,
-                    scraped_at, scrape_error
-                ) VALUES (
-                    :overview_page, :game_name, :tag_line, :region, :platform,
-                    :scraped_at, NULL
-                )
-                ON CONFLICT(overview_page, game_name, tag_line, platform)
-                DO UPDATE SET
-                    region       = excluded.region,
-                    scraped_at   = excluded.scraped_at,
-                    scrape_error = NULL
-                """,
+        # Batch: jeden executemany w jednej transakcji zamiast N osobnych
+        # execute — przy graczu z kilkoma kontami mniej round-tripów do SQLite.
+        conn.executemany(
+            """
+            INSERT INTO lolpros_accounts (
+                overview_page, game_name, tag_line, region, platform,
+                scraped_at, scrape_error
+            ) VALUES (
+                :overview_page, :game_name, :tag_line, :region, :platform,
+                :scraped_at, NULL
+            )
+            ON CONFLICT(overview_page, game_name, tag_line, platform)
+            DO UPDATE SET
+                region       = excluded.region,
+                scraped_at   = excluded.scraped_at,
+                scrape_error = NULL
+            """,
+            [
                 {
                     "overview_page": overview_page,
                     "game_name": acc["game_name"],
@@ -819,8 +821,10 @@ def upsert_lolpros_accounts(
                     "region":    acc["region"],
                     "platform":  acc["platform"],
                     "scraped_at": now,
-                },
-            )
+                }
+                for acc in accounts
+            ],
+        )
 
 
 def fetch_lolpros_accounts(overview_page: str) -> list[dict]:
@@ -861,6 +865,19 @@ def count_lolpros_scraped() -> int:
     with get_conn_cohort() as conn:
         return conn.execute(
             "SELECT COUNT(DISTINCT overview_page) AS n FROM lolpros_accounts"
+        ).fetchone()["n"]
+
+
+def count_all_lolpros_accounts() -> int:
+    """Liczba realnych kont (bez placeholderów pustych).
+
+    Tańszy odpowiednik ``len(fetch_all_lolpros_accounts())`` — liczy wiersze
+    bezpośrednio w SQL, zamiast materializować całą tabelę z JOIN-em do
+    players_all tylko po to, żeby policzyć długość listy.
+    """
+    with get_conn_cohort() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) AS n FROM lolpros_accounts WHERE game_name != ''"
         ).fetchone()["n"]
 
 
