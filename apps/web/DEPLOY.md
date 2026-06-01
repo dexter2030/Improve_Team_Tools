@@ -1,7 +1,12 @@
 # Deploy na Vercel
 
-Improve Team Tools = monorepo. Web app żyje w `web/` — Vercel musi
+Improve Team Tools = monorepo. Web app żyje w `apps/web/` — Vercel musi
 dostać tę ścieżkę jako Root Directory.
+
+> ⚠️ Po przeniesieniu z `web/` do `apps/web/` (podział na `apps/` + `packages/`)
+> trzeba **ręcznie** zmienić Root Directory w ustawieniach istniejącego projektu
+> Vercel: Settings → General → Root Directory → `apps/web`. Bez tego deploy
+> będzie budował ze starej ścieżki i przestanie działać.
 
 ## 1. Połączenie z GitHubem
 
@@ -9,7 +14,7 @@ dostać tę ścieżkę jako Root Directory.
 2. **Add New → Project** → wybierz `dexter2030/Improve_Team_Tools`.
 3. **Configure Project**:
    - **Framework Preset**: Next.js (auto-detect po ustawieniu Root Dir).
-   - **Root Directory**: `web` ← **kluczowe**, kliknij "Edit" i wpisz.
+   - **Root Directory**: `apps/web` ← **kluczowe**, kliknij "Edit" i wpisz.
    - **Build Command**: (zostaw default — `next build`).
    - **Output Directory**: (zostaw default — `.next`).
    - **Install Command**: (zostaw default — `npm install`).
@@ -84,7 +89,7 @@ SSL leci auto (Let's Encrypt).
 ## 6. Migracje schema (gdy zmienisz tabele)
 
 ```bash
-cd web
+cd apps/web
 npx drizzle-kit generate --name <opis>
 git add drizzle/
 git commit -m "..."

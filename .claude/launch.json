@@ -4,11 +4,12 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "web", "--", "--port", "3000"],
+      "runtimeArgs": ["run", "dev", "--prefix", "apps/web", "--", "--port", "3000"],
       "port": 3000
     },
     {
       "name": "lol-dashboard",
+      "cwd": "C:/Users/micha/Desktop/Cloude/Sessions/apps/streamlit-dashboard",
       "runtimeExecutable": "C:/Users/micha/Desktop/Cloude/Sessions/venv/Scripts/python.exe",
       "runtimeArgs": [
         "-m",
