@@ -209,6 +209,15 @@ export const lpPlayersAll = pgTable(
     index("lp_players_role_idx").on(t.role),
     index("lp_players_country_idx").on(t.country),
     index("lp_players_team_idx").on(t.team),
+    // GIN pg_trgm: przyspiesza wyszukiwanie ILIKE '%term%' po id/team/overview
+    // (substring search na ~20k wierszy — zwykły b-tree tego nie obsłuży).
+    // Wymaga rozszerzenia pg_trgm (tworzy je migracja 0006).
+    index("lp_players_search_trgm").using(
+      "gin",
+      sql`${t.id} gin_trgm_ops`,
+      sql`${t.team} gin_trgm_ops`,
+      sql`${t.overviewPage} gin_trgm_ops`,
+    ),
   ]
 );
 
@@ -251,6 +260,13 @@ export const lpTournamentPlayers = pgTable(
     index("lp_tp_league_idx").on(t.league),
     index("lp_tp_role_idx").on(t.role),
     index("lp_tp_team_idx").on(t.team),
+    // GIN pg_trgm dla wyszukiwarki ILIKE (jak w lp_players_all).
+    index("lp_tp_search_trgm").using(
+      "gin",
+      sql`${t.id} gin_trgm_ops`,
+      sql`${t.team} gin_trgm_ops`,
+      sql`${t.overviewPage} gin_trgm_ops`,
+    ),
   ]
 );
 

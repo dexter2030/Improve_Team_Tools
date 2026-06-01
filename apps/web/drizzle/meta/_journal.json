@@ -43,6 +43,13 @@
       "when": 1779745472900,
       "tag": "0005_first_pick_side",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780331811212,
+      "tag": "0006_player_search_trgm",
+      "breakpoints": true
     }
   ]
 }
