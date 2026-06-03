@@ -5,7 +5,7 @@
 
 import "server-only";
 
-import { sql, eq, inArray } from "drizzle-orm";
+import { sql, eq, or, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   lpPlayerStats,
@@ -53,6 +53,42 @@ export async function birthdatesFor(
     .where(inArray(lpPlayersAll.overviewPage, overviewPages));
   for (const r of rows) out.set(r.overviewPage, r.birthdate);
   return out;
+}
+
+/**
+ * Lata (sezony) obecne w statystykach — do selektora zakresu lat na widoku.
+ * Z `league` zawęża do jednej ligi (opcje na stronie ligi), bez — całość
+ * (strona narodowości). Malejąco: najnowszy rok najwyżej.
+ */
+export async function distinctStatYears(league?: string): Promise<number[]> {
+  const where = league
+    ? sql`WHERE ${lpPlayerStats.league} = ${league}`
+    : sql``;
+  const rows = await db.execute(sql`
+    SELECT DISTINCT ${lpPlayerStats.year} AS year
+    FROM ${lpPlayerStats}
+    ${where}
+    ORDER BY year DESC
+  `);
+  return rows.map((r) => r.year as number);
+}
+
+/**
+ * OverviewPages graczy danej narodowości (z globalnej lp_players_all). Łapiemy
+ * `Country` LUB `NationalityPrimary` — w Leaguepedii bywa wypełnione tylko jedno,
+ * a oba niosą narodowość (Country = kraj pochodzenia, nie rezydencja gry).
+ */
+export async function pagesByNationality(country: string): Promise<string[]> {
+  const rows = await db
+    .select({ overviewPage: lpPlayersAll.overviewPage })
+    .from(lpPlayersAll)
+    .where(
+      or(
+        eq(lpPlayersAll.country, country),
+        eq(lpPlayersAll.nationalityPrimary, country)
+      )
+    );
+  return rows.map((r) => r.overviewPage);
 }
 
 /** Liczba zrankowanych graczy (distinct) per liga — do indeksu /ranking. */

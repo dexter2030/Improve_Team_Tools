@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 export type RankSortColumn =
   | "player"
+  | "league"
   | "role"
   | "age"
   | "games"

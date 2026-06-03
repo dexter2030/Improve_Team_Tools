@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Flag, ArrowRight } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -6,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -40,6 +42,27 @@ export default async function RankingIndex() {
           otwórz jej ranking.
         </p>
       </div>
+
+      <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+          <div className="flex items-start gap-3">
+            <Flag className="h-5 w-5 mt-0.5 text-primary shrink-0" />
+            <div>
+              <p className="font-medium">Ranking Polaków</p>
+              <p className="text-sm text-muted-foreground">
+                Wszyscy gracze polskiej narodowości ze zsynchronizowanych lig w
+                jednym rankingu — niezależnie od ligi.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/ranking/nationality/Poland"
+            className={buttonVariants({ variant: "default", size: "sm" })}
+          >
+            Otwórz <ArrowRight className="h-4 w-4 ml-1" />
+          </Link>
+        </CardContent>
+      </Card>
 
       <Section
         title="Tier 1"
