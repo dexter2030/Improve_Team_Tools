@@ -50,6 +50,13 @@
       "when": 1780331811212,
       "tag": "0006_player_search_trgm",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1780507647213,
+      "tag": "0007_broken_dagger",
+      "breakpoints": true
     }
   ]
 }

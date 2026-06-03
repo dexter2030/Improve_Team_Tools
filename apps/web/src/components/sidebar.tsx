@@ -9,6 +9,7 @@ import {
   Database,
   LineChart,
   Trophy,
+  TrendingUp,
   Settings,
   LogOut,
   Home,
@@ -24,6 +25,7 @@ const NAV = [
   { href: "/draft-analyzer", label: "Draft Analyzer", icon: Swords },
   { href: "/database", label: "Database", icon: Database },
   { href: "/players-data", label: "Players Data", icon: LineChart },
+  { href: "/ranking", label: "Ranking", icon: TrendingUp },
   { href: "/match-data", label: "Match Data", icon: Trophy },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;

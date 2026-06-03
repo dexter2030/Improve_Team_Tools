@@ -16,6 +16,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -200,6 +201,9 @@ export const lpPlayersAll = pgTable(
     residency: text("residency"),
     nationalityPrimary: text("nationality_primary"),
     lolpros: text("lolpros"),
+    // Birthdate z Players.Birthdate (Leaguepedia) — źródło wieku dla sygnału
+    // "potencjał". Stabilniejsze niż Players.Age, które się starzeje.
+    birthdate: timestamp("birthdate", { withTimezone: true }),
     isRetired: boolean("is_retired").notNull().default(false),
     syncedAt: timestamp("synced_at", { withTimezone: true })
       .notNull()
@@ -279,6 +283,60 @@ export const lpTournamentPlayersSync = pgTable("lp_tournament_players_sync", {
 
 export type LpTournamentPlayer = typeof lpTournamentPlayers.$inferSelect;
 export type NewLpTournamentPlayer = typeof lpTournamentPlayers.$inferInsert;
+
+// --- lp_player_stats (agregaty meczowe per gracz/rok/liga) ------------------
+
+/**
+ * Jeden wiersz = sezon (rok) gracza w jednej lidze, zagregowany z Cargo
+ * `ScoreboardPlayers`. To CACHE statystyk (klucz = Leaguepedia Link =
+ * overviewPage), NIE zamrożone oceny — rating i potencjał liczymy w locie z
+ * tych wierszy (patrz src/lib/ranking/). Zgodne z CLAUDE.md: profile nie
+ * trzymają statystyk; tu trzymamy surowe agregaty osobno.
+ *
+ * Średnie są "per mecz" (nie z totali), żeby jeden koksowy mecz nie dominował.
+ * Metryki nullable — np. gold_share wymaga TeamGold, którego starsze mecze nie
+ * mają; brak → null i pomijamy metrykę w scoringu.
+ */
+export const lpPlayerStats = pgTable(
+  "lp_player_stats",
+  {
+    overviewPage: text("overview_page").notNull(),
+    year: integer("year").notNull(),
+    league: text("league").notNull(),
+    role: text("role"),
+    games: integer("games").notNull().default(0),
+    wins: integer("wins").notNull().default(0),
+    winrate: doublePrecision("winrate"),
+    kda: doublePrecision("kda"),
+    csPerMin: doublePrecision("cs_per_min"),
+    dpm: doublePrecision("dpm"),
+    kp: doublePrecision("kp"),
+    goldShare: doublePrecision("gold_share"),
+    syncedAt: timestamp("synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // Sezon gracza jest unikalny per (gracz, rok, liga) — ten sam gracz może
+    // mieć wiersze w wielu ligach tego samego roku (awans/spadek mid-season).
+    unique("lp_player_stats_pk").on(t.overviewPage, t.year, t.league),
+    index("lp_player_stats_league_idx").on(t.league),
+    index("lp_player_stats_overview_idx").on(t.overviewPage),
+  ]
+);
+
+/** Per-league sync state — kiedy ostatnio pobrane staty, kursor daty, ile sezonów. */
+export const lpPlayerStatsSync = pgTable("lp_player_stats_sync", {
+  league: text("league").primaryKey(),
+  lastFetched: timestamp("last_fetched", { withTimezone: true }),
+  lastGameDate: timestamp("last_game_date", { withTimezone: true }),
+  count: integer("count"),
+});
+
+export type LpPlayerStat = typeof lpPlayerStats.$inferSelect;
+export type NewLpPlayerStat = typeof lpPlayerStats.$inferInsert;
+export type LpPlayerStatsSync = typeof lpPlayerStatsSync.$inferSelect;
+export type NewLpPlayerStatsSync = typeof lpPlayerStatsSync.$inferInsert;
 
 // --- Typy ze schemy (do użycia w Server Actions / Components) ---------------
 
