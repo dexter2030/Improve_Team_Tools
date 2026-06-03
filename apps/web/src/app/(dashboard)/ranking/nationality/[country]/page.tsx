@@ -17,7 +17,7 @@ import { sortRankedPlayers } from "@/lib/ranking/sort";
 import { parseYearRange, yearRangeLabel } from "@/lib/ranking/year-range";
 import { RankingSortHeader } from "../../sort-header";
 import { RankingFilters } from "../../ranking-filters";
-import { YearTrend } from "../../year-trend";
+import { SplitTrend } from "../../split-trend";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +136,7 @@ export default async function NationalityRanking({
                           align="right"
                         />
                       </TableHead>
-                      <TableHead>Forma rok-do-roku</TableHead>
+                      <TableHead>Forma split-do-splitu</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -194,7 +194,7 @@ export default async function NationalityRanking({
                           </span>
                         </TableCell>
                         <TableCell>
-                          <YearTrend perYear={p.perYear} />
+                          <SplitTrend perSplit={p.perSplit} />
                         </TableCell>
                       </TableRow>
                     ))}

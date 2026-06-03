@@ -32,10 +32,12 @@ import {
   TRAJECTORY_CLAMP,
 } from "./weights";
 
-/** Minimalny kształt sezonu (zgodny strukturalnie z LpPlayerStat). */
+/** Minimalny kształt splitu gracza (zgodny strukturalnie z LpPlayerStat). */
 export interface SeasonStat {
   year: number;
   league: string;
+  split: string;
+  splitOrder: number; // rok + ułamek splitu — oś x trajektorii / recency
   role: string | null;
   games: number;
   kda: number | null;
@@ -47,14 +49,17 @@ export interface SeasonStat {
 
 export interface PlayerCareer {
   overviewPage: string;
-  seasons: SeasonStat[]; // wszystkie ligi/lata, jakie mamy w bazie
+  seasons: SeasonStat[]; // wszystkie ligi/lata/splity, jakie mamy w bazie
   birthdate: Date | null;
 }
 
+/** Jeden split w trajektorii formy: Z w swojej kohorcie (rola×liga×rok×split). */
 export interface SeasonScore {
   year: number;
   league: string;
-  yearZ: number | null;
+  split: string;
+  splitOrder: number;
+  z: number | null;
   games: number;
 }
 
@@ -71,17 +76,19 @@ export interface RankedPlayer {
   potentialZ: number;
   potentialLabel: string;
   lowSample: boolean;
-  perYear: SeasonScore[];
+  perSplit: SeasonScore[];
 }
 
-// --- Composite Z pojedynczego sezonu ---------------------------------------
+// --- Composite Z pojedynczego splitu ---------------------------------------
 
-/** Średnia dostępnych Z-score'ów metryk sezonu w jego kohorcie; null gdy brak. */
-export function composeYearZ(
+/** Średnia dostępnych Z-score'ów metryk splitu w jego kohorcie; null gdy brak. */
+export function composeSeasonZ(
   season: SeasonStat,
   cohorts: Map<CohortKey, Cohort>
 ): number | null {
-  const cohort = cohorts.get(cohortKey(season.role, season.league, season.year));
+  const cohort = cohorts.get(
+    cohortKey(season.role, season.league, season.year, season.split)
+  );
   if (!cohort) return null;
   const zs: number[] = [];
   for (const m of SCORED_METRICS) {
@@ -107,52 +114,58 @@ export function rankLeague(params: {
     const inLeague = p.seasons.filter((s) => s.league === league);
     if (inLeague.length === 0) continue;
 
-    const latestInLeague = inLeague.reduce((a, b) => (b.year > a.year ? b : a));
+    // Najnowszy split w tej lidze — po splitOrder (rok + ułamek splitu).
+    const latestInLeague = inLeague.reduce((a, b) =>
+      b.splitOrder > a.splitOrder ? b : a
+    );
     const role = latestInLeague.role;
     if (roleFilter && role !== roleFilter) continue;
 
     const careerLatestYear = p.seasons.reduce((m, s) => Math.max(m, s.year), 0);
 
-    // --- Ocena ogólna: sezony w TEJ lidze, ważone recency × próbą ---
+    // --- Ocena ogólna: splity w TEJ lidze, ważone recency × próbą ---
     let sw = 0;
     let swz = 0;
     let gamesInLeague = 0;
     for (const s of inLeague) {
       gamesInLeague += s.games;
-      const z = composeYearZ(s, cohorts);
+      const z = composeSeasonZ(s, cohorts);
       if (z === null) continue;
       const w =
-        recencyWeight(s.year, latestInLeague.year) * sampleWeight(s.games);
+        recencyWeight(s.splitOrder, latestInLeague.splitOrder) *
+        sampleWeight(s.games);
       sw += w;
       swz += w * z;
     }
     if (sw === 0) continue; // brak policzalnego Z — nie da się ocenić
     const ratingZ = swz / sw;
 
-    // --- Per-rok (cała kariera) — do trajektorii/awansu i do UI ---
-    const perYear: SeasonScore[] = [...p.seasons]
-      .sort((a, b) => a.year - b.year)
+    // --- Per-split (cała kariera) — do trajektorii/awansu i do UI ---
+    const perSplit: SeasonScore[] = [...p.seasons]
+      .sort((a, b) => a.splitOrder - b.splitOrder)
       .map((s) => ({
         year: s.year,
         league: s.league,
-        yearZ: composeYearZ(s, cohorts),
+        split: s.split,
+        splitOrder: s.splitOrder,
+        z: composeSeasonZ(s, cohorts),
         games: s.games,
       }));
 
     // --- Cztery sygnały potencjału ---
-    const base = composeYearZ(latestInLeague, cohorts) ?? ratingZ;
+    const base = composeSeasonZ(latestInLeague, cohorts) ?? ratingZ;
 
-    const zPoints = perYear
-      .filter((y) => y.yearZ !== null)
-      .map((y) => ({ x: y.year, y: y.yearZ as number, w: sampleWeight(y.games) }));
+    const zPoints = perSplit
+      .filter((y) => y.z !== null)
+      .map((y) => ({ x: y.splitOrder, y: y.z as number, w: sampleWeight(y.games) }));
     const trajectory = clamp(
       weightedSlope(zPoints),
       -TRAJECTORY_CLAMP,
       TRAJECTORY_CLAMP
     );
 
-    const strengthPoints = perYear.map((y) => ({
-      x: y.year,
+    const strengthPoints = perSplit.map((y) => ({
+      x: y.splitOrder,
       y: leagueStrength(y.league),
       w: sampleWeight(y.games),
     }));
@@ -173,7 +186,7 @@ export function rankLeague(params: {
       POTENTIAL_WEIGHTS.ascension * ascension;
 
     const cohortLatest = cohorts.get(
-      cohortKey(role, league, latestInLeague.year)
+      cohortKey(role, league, latestInLeague.year, latestInLeague.split)
     );
     const lowSample =
       gamesInLeague < MIN_SEASON_GAMES || (cohortLatest?.lowSample ?? true);
@@ -191,7 +204,7 @@ export function rankLeague(params: {
       potentialZ,
       potentialLabel: labelForZ(potentialZ),
       lowSample,
-      perYear,
+      perSplit,
     });
   }
 
@@ -202,8 +215,9 @@ export function rankLeague(params: {
 
 // --- Mapowania i wagi -------------------------------------------------------
 
-function recencyWeight(year: number, latestYear: number): number {
-  return RECENCY_DECAY ** (latestYear - year);
+/** Zanik wagi po splitOrder (rok+ułamek); latest = waga 1. Half-life w latach. */
+function recencyWeight(order: number, latestOrder: number): number {
+  return RECENCY_DECAY ** (latestOrder - order);
 }
 
 function sampleWeight(games: number): number {

@@ -3,7 +3,7 @@ import type { LpPlayerStat } from "@/lib/db/schema";
 import { buildCohorts } from "./cohort";
 import {
   ageFactor,
-  composeYearZ,
+  composeSeasonZ,
   rankLeague,
   tierForZ,
   to100,
@@ -30,21 +30,29 @@ function stat(
     dpm: null,
     kp: null,
     goldShare: null,
+    split: "Summer", // domyślnie 1 split/rok; splitOrder = rok + 0.5
+    splitOrder: o.year + 0.5,
     syncedAt: new Date(0),
     ...o,
   } as LpPlayerStat;
 }
 
-/** Kohorta n „przeciętnych" midów w danej lidze/roku (rozrzut → std > 0). */
-function baseline(league: string, year: number, n = 5): LpPlayerStat[] {
+/** Kohorta n „przeciętnych" midów w danej lidze/roku/splicie (rozrzut → std > 0). */
+function baseline(
+  league: string,
+  year: number,
+  n = 5,
+  split = "Summer"
+): LpPlayerStat[] {
   const rows: LpPlayerStat[] = [];
   for (let i = 0; i < n; i++) {
     const d = i - (n - 1) / 2; // wyśrodkowany rozrzut
     rows.push(
       stat({
-        overviewPage: `Base_${league}_${year}_${i}`,
+        overviewPage: `Base_${league}_${year}_${split}_${i}`,
         year,
         league,
+        split,
         role: "Mid",
         games: 20,
         kda: 3.0 + d * 0.3,
@@ -117,12 +125,14 @@ describe("to100 / tierForZ", () => {
 
 // --- Kohorta / Z-score ------------------------------------------------------
 
-describe("buildCohorts + composeYearZ", () => {
+describe("buildCohorts + composeSeasonZ", () => {
   it("wartości powyżej średniej kohorty => dodatni composite Z", () => {
     const cohorts = buildCohorts(baseline("LFL", 2025));
     const high = {
       year: 2025,
       league: "LFL",
+      split: "Summer", // ta sama kohorta co baseline
+      splitOrder: 2025.5,
       role: "Mid",
       games: 20,
       kda: 5,
@@ -131,16 +141,18 @@ describe("buildCohorts + composeYearZ", () => {
       kp: 0.8,
       goldShare: 0.3,
     };
-    const z = composeYearZ(high, cohorts);
+    const z = composeSeasonZ(high, cohorts);
     expect(z).not.toBeNull();
     expect(z as number).toBeGreaterThan(0);
   });
 
-  it("brak kohorty => null (sezon pomijany w scoringu)", () => {
-    const cohorts = buildCohorts(baseline("LFL", 2025));
-    const orphan = {
-      year: 2019,
-      league: "LCK",
+  it("inny split => brak kohorty => null (split pomijany w scoringu)", () => {
+    const cohorts = buildCohorts(baseline("LFL", 2025)); // tylko Summer 2025
+    const otherSplit = {
+      year: 2025,
+      league: "LFL",
+      split: "Spring", // kohorta Spring 2025 nie istnieje
+      splitOrder: 2025.25,
       role: "Mid",
       games: 20,
       kda: 5,
@@ -149,7 +161,25 @@ describe("buildCohorts + composeYearZ", () => {
       kp: 0.8,
       goldShare: 0.3,
     };
-    expect(composeYearZ(orphan, cohorts)).toBeNull();
+    expect(composeSeasonZ(otherSplit, cohorts)).toBeNull();
+  });
+
+  it("brak kohorty (inna liga/rok) => null", () => {
+    const cohorts = buildCohorts(baseline("LFL", 2025));
+    const orphan = {
+      year: 2019,
+      league: "LCK",
+      split: "Summer",
+      splitOrder: 2019.5,
+      role: "Mid",
+      games: 20,
+      kda: 5,
+      csPerMin: 9,
+      dpm: 600,
+      kp: 0.8,
+      goldShare: 0.3,
+    };
+    expect(composeSeasonZ(orphan, cohorts)).toBeNull();
   });
 });
 
@@ -190,9 +220,9 @@ describe("rankLeague", () => {
     expect(byId.Rising.potential).toBeGreaterThan(byId.Veteran.potential);
   });
 
-  it("perYear pokrywa całą karierę (też ligę spoza rankowanej)", () => {
-    expect(byId.Rising.perYear.length).toBe(3);
-    expect(byId.Rising.perYear.map((y) => y.year)).toEqual([2023, 2024, 2025]);
+  it("perSplit pokrywa całą karierę (też ligę spoza rankowanej)", () => {
+    expect(byId.Rising.perSplit.length).toBe(3);
+    expect(byId.Rising.perSplit.map((y) => y.year)).toEqual([2023, 2024, 2025]);
   });
 
   it("wynik posortowany malejąco po ocenie", () => {
@@ -209,5 +239,33 @@ describe("rankLeague", () => {
       roleFilter: "Support",
     });
     expect(onlySupport.length).toBe(0);
+  });
+});
+
+// --- Grano splitu: dwa splity w jednym roku --------------------------------
+
+describe("rankLeague — split-do-splitu", () => {
+  // Splitter: słaby Spring, mocny Summer (ten sam rok, dwie osobne kohorty).
+  const data = [
+    ...baseline("LFL", 2025, 5, "Spring"),
+    ...baseline("LFL", 2025, 5, "Summer"),
+    stat({ overviewPage: "Splitter", year: 2025, league: "LFL", split: "Spring", splitOrder: 2025.25, role: "Mid", games: 20, kda: 2.0, csPerMin: 7.0, dpm: 380, kp: 0.58, goldShare: 0.2 }),
+    stat({ overviewPage: "Splitter", year: 2025, league: "LFL", split: "Summer", splitOrder: 2025.5, role: "Mid", games: 20, kda: 5.5, csPerMin: 9.5, dpm: 620, kp: 0.78, goldShare: 0.27 }),
+  ];
+  const cohorts = buildCohorts(data);
+  const players = groupPlayers(data, { Splitter: null });
+  const splitter = rankLeague({ league: "LFL", players, cohorts }).find(
+    (p) => p.overviewPage === "Splitter"
+  )!;
+
+  it("każdy split osobnym chipem, posortowane chronologicznie", () => {
+    expect(splitter.perSplit.map((s) => s.split)).toEqual(["Spring", "Summer"]);
+  });
+
+  it("split liczony vs własna kohorta (słaby Spring < mocny Summer)", () => {
+    const [spring, summer] = splitter.perSplit;
+    expect(spring.z).not.toBeNull();
+    expect(summer.z).not.toBeNull();
+    expect((spring.z as number)).toBeLessThan(summer.z as number);
   });
 });

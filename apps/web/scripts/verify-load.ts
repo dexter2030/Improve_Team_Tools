@@ -6,15 +6,16 @@ async function main() {
   const { db } = await import("../src/lib/db/index");
 
   const per = await db.execute(
-    sql`select league, count(*)::int as seasons, count(distinct overview_page)::int as players,
-        min(year)::int as y0, max(year)::int as y1
-        from lp_player_stats group by league order by seasons desc`
+    sql`select league, count(*)::int as rows, count(distinct overview_page)::int as players,
+        count(distinct split)::int as splits, min(year)::int as y0, max(year)::int as y1
+        from lp_player_stats group by league order by rows desc`
   );
   console.log("=== lp_player_stats per liga ===");
   console.table(per);
 
   const tot = await db.execute(
-    sql`select count(*)::int as seasons, count(distinct overview_page)::int as players from lp_player_stats`
+    sql`select count(*)::int as rows, count(distinct overview_page)::int as players,
+        count(distinct split)::int as splits from lp_player_stats`
   );
   console.log("TOTAL:", tot[0]);
 
@@ -25,7 +26,7 @@ async function main() {
 
   console.log("=== próbka: LEC 2025, top 5 wg KDA ===");
   const sample = await db.execute(
-    sql`select overview_page, role, games,
+    sql`select overview_page, split, role, games,
         round(kda::numeric,2) as kda, round(cs_per_min::numeric,2) as cspm,
         round(dpm::numeric,0) as dpm, round((winrate*100)::numeric,0) as wr
         from lp_player_stats where league='LEC' and year=2025

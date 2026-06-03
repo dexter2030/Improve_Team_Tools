@@ -1,7 +1,7 @@
 /**
- * Agregacja surowych wierszy meczowych (ScoreboardPlayers) w sezony
- * gracza: jeden rekord per (gracz, rok, liga). Port
- * hidden_gems/leaguepedia.py::aggregate_player_stats.
+ * Agregacja surowych wierszy meczowych (ScoreboardPlayers) w SPLITY
+ * gracza: jeden rekord per (gracz, rok, liga, split). Port
+ * hidden_gems/leaguepedia.py::aggregate_player_stats, rozbity do grana splitu.
  *
  * Wszystkie wskaźniki to średnia z wartości PER MECZ (nie z totali) — żeby
  * jeden mecz koksowy nie dominował średniej. Metryka = null, gdy brak danych
@@ -10,10 +10,12 @@
 
 import type { ScoreboardPlayerRow } from "@/lib/leaguepedia/types";
 
-export interface PlayerYearAggregate {
+export interface PlayerSplitAggregate {
   overviewPage: string;
   year: number;
   league: string;
+  split: string;
+  splitOrder: number; // rok + ułamek splitu — oś x trajektorii / sortowanie
   role: string | null;
   games: number;
   wins: number;
@@ -25,14 +27,14 @@ export interface PlayerYearAggregate {
   goldShare: number | null;
 }
 
-/** Jednoznaczny klucz (gracz, rok, liga) — JSON, by uniknąć kolizji separatorów. */
+/** Jednoznaczny klucz (gracz, rok, liga, split) — JSON, by uniknąć kolizji separatorów. */
 function bucketKey(r: ScoreboardPlayerRow): string {
-  return JSON.stringify([r.link, r.year, r.league]);
+  return JSON.stringify([r.link, r.year, r.league, r.split]);
 }
 
-export function aggregatePlayerYears(
+export function aggregatePlayerSplits(
   rows: readonly ScoreboardPlayerRow[]
-): PlayerYearAggregate[] {
+): PlayerSplitAggregate[] {
   const buckets = new Map<string, ScoreboardPlayerRow[]>();
   for (const r of rows) {
     const key = bucketKey(r);
@@ -41,15 +43,18 @@ export function aggregatePlayerYears(
     else buckets.set(key, [r]);
   }
 
-  const out: PlayerYearAggregate[] = [];
+  const out: PlayerSplitAggregate[] = [];
   for (const group of buckets.values()) out.push(aggregateGroup(group));
   return out;
 }
 
-function aggregateGroup(rows: ScoreboardPlayerRow[]): PlayerYearAggregate {
+function aggregateGroup(rows: ScoreboardPlayerRow[]): PlayerSplitAggregate {
   const first = rows[0];
   const games = rows.length;
   const wins = rows.filter((r) => r.win).length;
+  // splitOrder jest stały w obrębie bucketu (rok+ułamek z SplitNumber/etykiety);
+  // min jako zabezpieczenie, gdyby fallback po miesiącu dał drobny rozjazd.
+  const splitOrder = rows.reduce((m, r) => Math.min(m, r.splitOrder), first.splitOrder);
 
   const perKda: number[] = [];
   const perCspm: number[] = [];
@@ -72,6 +77,8 @@ function aggregateGroup(rows: ScoreboardPlayerRow[]): PlayerYearAggregate {
     overviewPage: first.link,
     year: first.year,
     league: first.league,
+    split: first.split,
+    splitOrder,
     role: dominantRole(rows),
     games,
     wins,

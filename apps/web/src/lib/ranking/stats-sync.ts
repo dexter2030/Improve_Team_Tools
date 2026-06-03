@@ -1,7 +1,7 @@
 /**
  * Sync statystyk meczowych jednej ligi: fetch ScoreboardPlayers (okno
- * RANKING_SINCE_YEARS lat) → agregacja per (gracz, rok) → pełna podmiana w
- * lp_player_stats. Mirror drafts/sync.ts::fetchLeague.
+ * RANKING_SINCE_YEARS lat) → agregacja per (gracz, rok, split) → pełna podmiana
+ * w lp_player_stats. Mirror drafts/sync.ts::fetchLeague.
  *
  * Fetch jest per liga (jedno paginowane zapytanie obejmuje wszystkich graczy),
  * więc tanio względem rate-limitu Cargo.
@@ -10,14 +10,14 @@
 import "server-only";
 
 import { fetchScoreboardPlayers } from "@/lib/leaguepedia/scoreboard";
-import { aggregatePlayerYears } from "./aggregate";
+import { aggregatePlayerSplits } from "./aggregate";
 import { replaceLeagueStats } from "./stats-repository";
 import { RANKING_SINCE_YEARS } from "./weights";
 
 export interface StatsFetchOutcome {
   league: string;
   fetched: number; // wierszy meczowych z Cargo
-  saved: number; // sezonów (gracz×rok) zapisanych
+  saved: number; // splitów (gracz×rok×split) zapisanych
   error?: string;
 }
 
@@ -28,7 +28,7 @@ export async function syncLeagueStats(
     const sinceYear = new Date().getUTCFullYear() - (RANKING_SINCE_YEARS - 1);
     const rows = await fetchScoreboardPlayers(league, { sinceYear });
 
-    const aggregates = aggregatePlayerYears(rows);
+    const aggregates = aggregatePlayerSplits(rows);
     const now = new Date();
     const saved = await replaceLeagueStats(
       league,
@@ -36,6 +36,8 @@ export async function syncLeagueStats(
         overviewPage: a.overviewPage,
         year: a.year,
         league: a.league,
+        split: a.split,
+        splitOrder: a.splitOrder,
         role: a.role,
         games: a.games,
         wins: a.wins,
