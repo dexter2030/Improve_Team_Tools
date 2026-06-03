@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -18,15 +13,19 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { ALL_LEAGUES } from "@/lib/leaguepedia/leagues";
-import { RANKING_SINCE_YEARS } from "@/lib/ranking/weights";
-import { getLeagueRanking, type RankedPlayer } from "@/lib/ranking";
+import { getLeagueRanking } from "@/lib/ranking";
+import { distinctStatYears } from "@/lib/ranking/stats-repository";
+import { sortRankedPlayers } from "@/lib/ranking/sort";
+import { parseYearRange, yearRangeLabel } from "@/lib/ranking/year-range";
 import { RankingSortHeader } from "../sort-header";
+import { RankingFilters } from "../ranking-filters";
+import { YearTrend } from "../year-trend";
 
 export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ name: string }>;
-  searchParams: Promise<{ role?: string; sort?: string }>;
+  searchParams: Promise<{ role?: string; sort?: string; from?: string; to?: string }>;
 }
 
 export default async function LeagueRanking({ params, searchParams }: Props) {
@@ -37,11 +36,15 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
   const sp = await searchParams;
   const roleFilter = sp.role || undefined;
   const sort = sp.sort || "rating:desc";
+  const range = parseYearRange(sp.from, sp.to);
 
-  const all = await getLeagueRanking(league);
+  const [all, years] = await Promise.all([
+    getLeagueRanking(league, range),
+    distinctStatYears(league),
+  ]);
   const roles = [...new Set(all.map((p) => p.role).filter(Boolean))].sort() as string[];
   const filtered = roleFilter ? all.filter((p) => p.role === roleFilter) : all;
-  const rows = sortRows(filtered, sort);
+  const rows = sortRankedPlayers(filtered, sort);
 
   return (
     <div className="space-y-6">
@@ -56,13 +59,13 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
           Ranking — {league}
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          {rows.length} graczy · ocena i potencjał z ostatnich {RANKING_SINCE_YEARS}{" "}
-          sezonów (Leaguepedia). Ocena = forma vs kohorta (rola × liga × rok);
-          potencjał = trajektoria + wiek + dominacja + awans.
+          {rows.length} graczy · ocena i potencjał ({yearRangeLabel(range)},
+          Leaguepedia). Ocena = forma vs kohorta (rola × liga × rok); potencjał =
+          trajektoria + wiek + dominacja + awans.
         </p>
       </div>
 
-      {all.length === 0 ? (
+      {years.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             Brak danych dla tej ligi. Wróć do{" "}
@@ -74,40 +77,26 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
         </Card>
       ) : (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Filtry</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="grid gap-3 md:grid-cols-3" method="get">
-                <select
-                  name="role"
-                  defaultValue={roleFilter ?? ""}
-                  className="border rounded-md px-3 py-2 text-sm bg-background"
-                >
-                  <option value="">Wszystkie role</option>
-                  {roles.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-                {sort !== "rating:desc" && (
-                  <input type="hidden" name="sort" value={sort} />
-                )}
-                <button
-                  type="submit"
-                  className={buttonVariants({ variant: "default" })}
-                >
-                  Zastosuj
-                </button>
-              </form>
-            </CardContent>
-          </Card>
+          <RankingFilters
+            roles={roles}
+            years={years}
+            role={roleFilter}
+            from={range.yearFrom}
+            to={range.yearTo}
+            sort={sort}
+          />
 
-          <Card>
-            <CardContent className="p-0">
-              <Table>
+          {rows.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                Brak graczy dla wybranych filtrów. Poszerz zakres lat lub zmień
+                rolę.
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10">#</TableHead>
@@ -188,72 +177,12 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
   );
-}
-
-function YearTrend({ perYear }: { perYear: RankedPlayer["perYear"] }) {
-  return (
-    <div className="flex flex-wrap gap-1.5 text-xs">
-      {perYear.map((y) => (
-        <span
-          key={`${y.year}-${y.league}`}
-          title={`${y.league} (${y.games} gier)`}
-          className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 tabular-nums"
-        >
-          <span className="text-muted-foreground">
-            &apos;{String(y.year).slice(2)}
-          </span>
-          <span
-            className={
-              y.yearZ === null
-                ? "text-muted-foreground"
-                : y.yearZ >= 0
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-red-600 dark:text-red-400"
-            }
-          >
-            {y.yearZ === null
-              ? "·"
-              : (y.yearZ >= 0 ? "+" : "") + y.yearZ.toFixed(1)}
-          </span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function sortRows(rows: RankedPlayer[], sort: string): RankedPlayer[] {
-  const [col, dir] = sort.split(":");
-  const sign = dir === "asc" ? 1 : -1;
-  const val = (p: RankedPlayer): number | string => {
-    switch (col) {
-      case "player":
-        return p.overviewPage.toLowerCase();
-      case "role":
-        return p.role ?? "";
-      case "age":
-        return p.age ?? -1;
-      case "games":
-        return p.games;
-      case "potential":
-        return p.potential;
-      case "rating":
-      default:
-        return p.rating;
-    }
-  };
-  return [...rows].sort((a, b) => {
-    const va = val(a);
-    const vb = val(b);
-    if (typeof va === "string" || typeof vb === "string") {
-      return sign * String(va).localeCompare(String(vb));
-    }
-    return sign * (va - vb);
-  });
 }

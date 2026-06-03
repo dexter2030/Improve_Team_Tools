@@ -60,6 +60,7 @@ export interface SeasonScore {
 
 export interface RankedPlayer {
   overviewPage: string;
+  league: string; // liga, w której gracz jest rankowany (najnowsza dla rankingu narodowości)
   role: string | null;
   age: number | null;
   games: number; // suma gier w rankowanej lidze
@@ -179,6 +180,7 @@ export function rankLeague(params: {
 
     out.push({
       overviewPage: p.overviewPage,
+      league,
       role,
       age,
       games: gamesInLeague,
