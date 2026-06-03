@@ -1,10 +1,12 @@
 /**
  * Kohorty porównawcze: rozkład (mean + std) każdej metryki w grupie
- * (rola × liga × rok). Z-score liczymy względem tego rozkładu. Port
- * hidden_gems/scoring.py::_metric_dist.
+ * (rola × liga × rok × split). Z-score liczymy względem tego rozkładu. Port
+ * hidden_gems/scoring.py::_metric_dist, rozbity do grana splitu.
  *
  * Wariancja POPULACYJNA (dzielimy przez n, nie n-1) — kohorta to cała
- * populacja ligi w danym sezonie, nie próbka z większej całości.
+ * populacja ligi w danym splicie, nie próbka z większej całości. Per-split
+ * kohorty są mniejsze niż roczne → częściej lowSample (świadomy kompromis,
+ * patrz weights.ts: MIN_COHORT_PLAYERS).
  */
 
 import type { LpPlayerStat } from "@/lib/db/schema";
@@ -26,18 +28,20 @@ export interface Cohort {
   role: string | null;
   league: string;
   year: number;
+  split: string;
   nPlayers: number;
   lowSample: boolean;
   dist: Partial<Record<ScoredMetric, MetricDist>>;
 }
 
-/** Jednoznaczny klucz (rola, liga, rok) — JSON, by uniknąć kolizji separatorów. */
+/** Jednoznaczny klucz (rola, liga, rok, split) — JSON, by uniknąć kolizji separatorów. */
 export function cohortKey(
   role: string | null,
   league: string,
-  year: number
+  year: number,
+  split: string
 ): CohortKey {
-  return JSON.stringify([role, league, year]);
+  return JSON.stringify([role, league, year, split]);
 }
 
 /**
@@ -53,7 +57,7 @@ export function buildCohorts(
 ): Map<CohortKey, Cohort> {
   const groups = new Map<CohortKey, LpPlayerStat[]>();
   for (const s of stats) {
-    const key = cohortKey(s.role, s.league, s.year);
+    const key = cohortKey(s.role, s.league, s.year, s.split);
     const arr = groups.get(key);
     if (arr) arr.push(s);
     else groups.set(key, [s]);
@@ -74,6 +78,7 @@ export function buildCohorts(
       role: sample.role,
       league: sample.league,
       year: sample.year,
+      split: sample.split,
       nPlayers: members.length,
       lowSample: members.length < MIN_COHORT_PLAYERS,
       dist,

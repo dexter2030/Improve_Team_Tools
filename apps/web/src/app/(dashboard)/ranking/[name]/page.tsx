@@ -19,7 +19,7 @@ import { sortRankedPlayers } from "@/lib/ranking/sort";
 import { parseYearRange, yearRangeLabel } from "@/lib/ranking/year-range";
 import { RankingSortHeader } from "../sort-header";
 import { RankingFilters } from "../ranking-filters";
-import { YearTrend } from "../year-trend";
+import { SplitTrend } from "../split-trend";
 
 export const dynamic = "force-dynamic";
 
@@ -60,8 +60,8 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           {rows.length} graczy · ocena i potencjał ({yearRangeLabel(range)},
-          Leaguepedia). Ocena = forma vs kohorta (rola × liga × rok); potencjał =
-          trajektoria + wiek + dominacja + awans.
+          Leaguepedia). Ocena = forma vs kohorta (rola × liga × rok × split);
+          potencjał = trajektoria + wiek + dominacja + awans.
         </p>
       </div>
 
@@ -122,7 +122,7 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
                         align="right"
                       />
                     </TableHead>
-                    <TableHead>Forma rok-do-roku</TableHead>
+                    <TableHead>Forma split-do-splitu</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -172,7 +172,7 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <YearTrend perYear={p.perYear} />
+                        <SplitTrend perSplit={p.perSplit} />
                       </TableCell>
                     </TableRow>
                   ))}

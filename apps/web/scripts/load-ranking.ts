@@ -2,8 +2,8 @@
  * Jednorazowy loader danych rankingu do bazy (Supabase) — z pacingiem pod
  * rate-limit Leaguepedia Cargo.
  *
- * Pobiera ScoreboardPlayers per liga (okno 5 lat) → agreguje per (gracz, rok) →
- * zapisuje do lp_player_stats. Następnie CELOWANO uzupełnia birthdate w
+ * Pobiera ScoreboardPlayers per liga (okno 5 lat) → agreguje per (gracz, rok,
+ * split) → zapisuje do lp_player_stats. Następnie CELOWANO uzupełnia birthdate w
  * lp_players_all (tylko dla wczytanych graczy). Importy względne, bez modułów
  * "server-only"; `db` ładowany dynamicznie PO loadEnvConfig.
  *
@@ -24,7 +24,7 @@ import {
   lpPlayersAll,
 } from "../src/lib/db/schema";
 import { fetchScoreboardPlayers } from "../src/lib/leaguepedia/scoreboard";
-import { aggregatePlayerYears } from "../src/lib/ranking/aggregate";
+import { aggregatePlayerSplits } from "../src/lib/ranking/aggregate";
 import { LEAGUE_GROUPS } from "../src/lib/leaguepedia/leagues";
 import { cargoQuery, cargoEscape, toStr } from "../src/lib/leaguepedia/cargo";
 
@@ -46,7 +46,7 @@ async function loadLeague(league: string) {
     }
     try {
       const rows = await fetchScoreboardPlayers(league, { sinceYear });
-      const aggs = aggregatePlayerYears(rows);
+      const aggs = aggregatePlayerSplits(rows);
       await db.delete(lpPlayerStats).where(eq(lpPlayerStats.league, league));
       const now = new Date();
       const CHUNK = 500;
@@ -150,7 +150,7 @@ async function main() {
     const lg = leagues[i];
     try {
       const r = await loadLeague(lg);
-      console.log(`[ok]  ${r.league}: ${r.saved} sezonów (z ${r.fetched} gier)`);
+      console.log(`[ok]  ${r.league}: ${r.saved} splitów (z ${r.fetched} gier)`);
       results.push(r);
     } catch (e) {
       const msg = (e as { message?: string })?.message ?? e;

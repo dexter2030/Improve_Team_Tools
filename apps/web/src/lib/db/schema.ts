@@ -284,18 +284,20 @@ export const lpTournamentPlayersSync = pgTable("lp_tournament_players_sync", {
 export type LpTournamentPlayer = typeof lpTournamentPlayers.$inferSelect;
 export type NewLpTournamentPlayer = typeof lpTournamentPlayers.$inferInsert;
 
-// --- lp_player_stats (agregaty meczowe per gracz/rok/liga) ------------------
+// --- lp_player_stats (agregaty meczowe per gracz/rok/liga/split) ------------
 
 /**
- * Jeden wiersz = sezon (rok) gracza w jednej lidze, zagregowany z Cargo
+ * Jeden wiersz = SPLIT gracza w jednej lidze (rok + split), zagregowany z Cargo
  * `ScoreboardPlayers`. To CACHE statystyk (klucz = Leaguepedia Link =
  * overviewPage), NIE zamrożone oceny — rating i potencjał liczymy w locie z
  * tych wierszy (patrz src/lib/ranking/). Zgodne z CLAUDE.md: profile nie
  * trzymają statystyk; tu trzymamy surowe agregaty osobno.
  *
- * Średnie są "per mecz" (nie z totali), żeby jeden koksowy mecz nie dominował.
- * Metryki nullable — np. gold_share wymaga TeamGold, którego starsze mecze nie
- * mają; brak → null i pomijamy metrykę w scoringu.
+ * `split` = etykieta splitu (np. Spring/Summer/Winter; "Sezon" dla eventów bez
+ * splitów). `split_order` = rok + ułamek splitu — monotoniczna oś x do
+ * trajektorii i sortowania chipów. Średnie są "per mecz" (nie z totali), żeby
+ * jeden koksowy mecz nie dominował. Metryki nullable — np. gold_share wymaga
+ * TeamGold, którego starsze mecze nie mają; brak → null i pomijamy w scoringu.
  */
 export const lpPlayerStats = pgTable(
   "lp_player_stats",
@@ -303,6 +305,8 @@ export const lpPlayerStats = pgTable(
     overviewPage: text("overview_page").notNull(),
     year: integer("year").notNull(),
     league: text("league").notNull(),
+    split: text("split").notNull().default("Sezon"),
+    splitOrder: doublePrecision("split_order").notNull().default(0),
     role: text("role"),
     games: integer("games").notNull().default(0),
     wins: integer("wins").notNull().default(0),
@@ -317,9 +321,9 @@ export const lpPlayerStats = pgTable(
       .defaultNow(),
   },
   (t) => [
-    // Sezon gracza jest unikalny per (gracz, rok, liga) — ten sam gracz może
-    // mieć wiersze w wielu ligach tego samego roku (awans/spadek mid-season).
-    unique("lp_player_stats_pk").on(t.overviewPage, t.year, t.league),
+    // Split gracza jest unikalny per (gracz, rok, liga, split) — ten sam gracz
+    // ma wiele splitów w roku, a bywa i wiele lig w roku (awans/spadek mid-rok).
+    unique("lp_player_stats_pk").on(t.overviewPage, t.year, t.league, t.split),
     index("lp_player_stats_league_idx").on(t.league),
     index("lp_player_stats_overview_idx").on(t.overviewPage),
   ]

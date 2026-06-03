@@ -1,14 +1,19 @@
 /**
- * Cargo — surowe statystyki meczowe graczy (ScoreboardPlayers + ScoreboardGames).
+ * Cargo — surowe statystyki meczowe graczy (ScoreboardPlayers + ScoreboardGames
+ * + Tournaments).
  *
- * Join: ScoreboardPlayers.GameId = ScoreboardGames.GameId. Z ScoreboardGames
- * bierzemy datę (DateTime_UTC → rok), długość gry (do CS/min, DPM) i Tournament
- * (filtr ligi). To FETCH ONLY — agregacja per rok i scoring są w src/lib/ranking/.
+ * Join: ScoreboardPlayers.GameId = ScoreboardGames.GameId, a dalej
+ * ScoreboardGames.OverviewPage = Tournaments.OverviewPage (po metadane splitu).
+ * Z ScoreboardGames bierzemy datę (DateTime_UTC → fallback roku), długość gry
+ * (do CS/min, DPM) i Tournament (filtr ligi); z Tournaments — Year (stabilny rok
+ * sezonu) i Split/SplitNumber (split). To FETCH ONLY — agregacja per split i
+ * scoring są w src/lib/ranking/.
  *
  * Filtr ligi jak w drafts.ts: Tournament LIKE '%liga%' + wykluczenia
  * moreSpecific() (żeby "LFL" nie łapało "LFL Division 2"). `league` w zwracanym
  * wierszu to krótka nazwa, którą pytaliśmy — nie surowy Tournament — żeby
- * kohorty w scoringu grupowały się czysto.
+ * kohorty w scoringu grupowały się czysto. Join do Tournaments jest INNER, ale
+ * każdy ScoreboardGames ma swoją stronę turnieju, więc nie gubimy meczów.
  */
 
 import {
@@ -21,6 +26,7 @@ import {
   type CargoRow,
 } from "./cargo";
 import { moreSpecific } from "./leagues";
+import { deriveSplit, splitFraction } from "./split";
 import type { ScoreboardPlayerRow } from "./types";
 
 const SCOREBOARD_FIELDS = [
@@ -37,9 +43,16 @@ const SCOREBOARD_FIELDS = [
   "ScoreboardPlayers.PlayerWin=PlayerWin",
   "ScoreboardGames.DateTime_UTC=DateTime",
   "ScoreboardGames.Gamelength_Number=GameLength",
+  "ScoreboardGames.Tournament=Tournament",
+  "ScoreboardGames.OverviewPage=TournamentPage",
+  "Tournaments.Year=TournamentYear",
+  "Tournaments.Split=Split",
+  "Tournaments.SplitNumber=SplitNumber",
 ].join(",");
 
-const SCOREBOARD_JOIN_ON = "ScoreboardPlayers.GameId=ScoreboardGames.GameId";
+const SCOREBOARD_JOIN_ON =
+  "ScoreboardPlayers.GameId=ScoreboardGames.GameId," +
+  "ScoreboardGames.OverviewPage=Tournaments.OverviewPage";
 
 export interface FetchScoreboardOpts {
   /** Tylko mecze od tego roku włącznie (okno kariery). */
@@ -73,7 +86,7 @@ export async function fetchScoreboardPlayers(
 
   const rows = await cargoPaginated(
     {
-      tables: "ScoreboardPlayers,ScoreboardGames",
+      tables: "ScoreboardPlayers,ScoreboardGames,Tournaments",
       fields: SCOREBOARD_FIELDS,
       where: whereParts.join(" AND "),
       joinOn: SCOREBOARD_JOIN_ON,
@@ -93,12 +106,29 @@ function normalize(row: CargoRow, league: string): ScoreboardPlayerRow | null {
   const date = parseUtc(row.DateTime);
   if (!date) return null; // bez daty nie da się przypisać sezonu (roku)
 
+  // Rok sezonu: Tournaments.Year jest stabilny (np. Winter rozgrywany w grudniu
+  // poprzedniego roku nadal należy do swojego sezonu); fallback do roku z daty.
+  const tournamentYear = toInt(row.TournamentYear);
+  const year = tournamentYear > 0 ? tournamentYear : date.getUTCFullYear();
+
+  const split = deriveSplit(
+    toStr(row.Split),
+    toStr(row.TournamentPage),
+    toStr(row.Tournament)
+  );
+  const splitNumber = toInt(row.SplitNumber);
+  const splitOrder =
+    year +
+    splitFraction(splitNumber > 0 ? splitNumber : null, split, date.getUTCMonth() + 1);
+
   const gameLength = toFloat(row.GameLength);
   return {
     link,
     role: toStr(row.Role) || null,
-    year: date.getUTCFullYear(),
+    year,
     league,
+    split,
+    splitOrder,
     win: toBool(row.PlayerWin),
     gameLength: gameLength > 0 ? gameLength : null,
     kills: toInt(row.Kills),
