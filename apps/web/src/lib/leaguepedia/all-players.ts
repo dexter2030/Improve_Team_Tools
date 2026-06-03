@@ -14,6 +14,7 @@ export interface RawLpPlayer {
   residency: string | null;
   nationalityPrimary: string | null;
   lolpros: string | null;
+  birthdate: Date | null;
   isRetired: boolean;
 }
 
@@ -25,7 +26,7 @@ export async function fetchAllPlayers(maxRows = 50000): Promise<RawLpPlayer[]> {
         "Players.OverviewPage=OverviewPage,Players.ID=ID,Players.Team=Team," +
         "Players.Role=Role,Players.Country=Country,Players.Residency=Residency," +
         "Players.NationalityPrimary=NationalityPrimary,Players.Lolpros=Lolpros," +
-        "Players.IsRetired=IsRetired",
+        "Players.Birthdate=Birthdate,Players.IsRetired=IsRetired",
       orderBy: "Players.OverviewPage ASC",
     },
     maxRows
@@ -43,6 +44,15 @@ function normalize(row: CargoRow): RawLpPlayer {
     residency: toStr(row.Residency) || null,
     nationalityPrimary: toStr(row.NationalityPrimary) || null,
     lolpros: toStr(row.Lolpros) || null,
+    birthdate: parseBirthdate(row.Birthdate),
     isRetired: toBool(row.IsRetired),
   };
+}
+
+function parseBirthdate(value: unknown): Date | null {
+  const s = toStr(value).trim();
+  // Leaguepedia Birthdate: "YYYY-MM-DD". Puste / niekompletne ("1999-00-00") → null.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T00:00:00Z`);
+  return Number.isFinite(d.getTime()) ? d : null;
 }

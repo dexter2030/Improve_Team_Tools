@@ -290,6 +290,16 @@ export function toInt(value: unknown): number {
   return 0;
 }
 
+/** Jak toInt, ale bez obcinania do całkowitej (np. Gamelength_Number w minutach). */
+export function toFloat(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
 export function toBool(value: unknown): boolean {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value !== 0;
