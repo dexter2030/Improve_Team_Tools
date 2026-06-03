@@ -3,7 +3,15 @@
 Lista rzeczy do zrobienia / weryfikacji wokół Cohort Baseline i SoloQ Lookup.
 Pogrupowane po pilności. Najświeższe rzeczy są na górze każdej sekcji.
 
-## Pilne — smoke test po merge PR #6
+> **Stan na 2026-06-01:** refaktor monorepo (P1–P6) oraz porównanie do
+> kohorty (per-region / champion / Z-score) są zmergowane do `main`
+> (PR #13, #14). Szczegóły w sekcji „Zrobione" na dole — odhaczone tam
+> pozycje są zweryfikowane w kodzie.
+
+## Pilne — manualny smoke test produkcji
+
+Wymaga człowieka w przeglądarce po deployu; nie da się odhaczyć z poziomu
+testów. Najważniejszy jest pierwszy scrape lolpros (zob. Znane ryzyka).
 
 - [ ] Otworzyć production (`improve-team-tools.vercel.app`) po deployu i
       sprawdzić, czy w sidebarze widać **SoloQ Lookup** i **Cohort Baseline**.
@@ -11,7 +19,7 @@ Pogrupowane po pilności. Najświeższe rzeczy są na górze każdej sekcji.
       zwrócić rangę, listę championów i tabelę meczy bez błędów.
 - [ ] **Cohort Baseline → sekcja 1 (Scrape lolpros)**: na 5 graczach
       sprawdzić, czy zwraca konta (jeśli wszędzie `0 accounts` — schemat
-      NEXT_DATA się zmienił, parser w `draft_analyzer/lolpros.py`
+      NEXT_DATA się zmienił, parser w `lolpros.py`
       `scrape_lolpros_accounts` wymaga korekty).
 - [ ] **Cohort Baseline → sekcja 2 (Compute baseline)**: ustawić limit
       na 10 kont, odpalić, sprawdzić, czy raport końcowy ma niezerowe
@@ -35,24 +43,14 @@ Pogrupowane po pilności. Najświeższe rzeczy są na górze każdej sekcji.
   w batchach.
 - **Streamlit blokuje UI podczas batch fetch.** Zamknięta przeglądarka =
   przerwany fetch (cache zostaje, więc retry kontynuuje). Do rozważenia
-  background worker (zob. Ulepszenia poniżej).
+  background worker (zob. Ulepszenia — workflow).
 
 ## Ulepszenia — comparison quality
 
-- [ ] **Per-region kohorty.** KR vs EU mają zupełnie inny meta (CS/min,
-      gold/min). Z-score liczony globalnie krzywdzi/faworyzuje
-      regiony. Dodać filter region (na bazie kolumny `platform` w
-      `soloq_baseline`) w sekcji „Compare against cohort".
-- [ ] **Champion-specific comparison.** Scoutowanie midlanera grającego
-      głównie Ahri — porównanie do kohorty „wszyscy midi" zaszumione.
-      Możliwość: filter „same champion as player's most-played" + Z-score
-      vs kohorta tego championa.
 - [ ] **Split-over-split delta.** Drugi cutoff w `soloq_baseline` (każdy
       gracz może mieć N wpisów per cutoff) → pokazać, czy gracz rośnie
-      (delta KDA, CS/min, GD@15 między splitami).
-- [ ] **Visualization Z-score bar chart.** W „Compare against cohort"
-      poziomy bar chart Z-score per metryka (zielone w prawo, czerwone w
-      lewo) — szybsze do skanowania niż tabela.
+      (delta KDA, CS/min, GD@15 między splitami). Wymaga zmian w
+      `src/processing/comparison.py` + UI w „Compare against cohort".
 
 ## Ulepszenia — workflow
 
@@ -77,20 +75,34 @@ Pogrupowane po pilności. Najświeższe rzeczy są na górze każdej sekcji.
       Z-score na ich roli powinni być easy-to-add do listy scoutingu
       (jeden klik per wiersz w „Browse cohort").
 - [ ] **Champion-icon column w pool table.** SoloQ Lookup champion pool
-      pokazuje tylko nazwy — ikona championa szybsza do skanowania.
+      pokazuje tylko nazwy (`_render_champion_section`) — ikona championa
+      szybsza do skanowania.
 
 ## Tech debt / sprzątanie
 
-- [ ] **Unit testy** dla `src/processing/comparison.py`,
-      `src/processing/soloq_aggregates.py`, `src/processing/cohort_baseline.py`.
-      Wzorzec: `tests/test_ranked.py`, `tests/test_champion_stats.py`.
-- [ ] **Match IDs cache TTL** — 15 min globalnie OK dla SoloQ Lookup, ale
-      dla baseline (rebuild raz na tydzień) za krótki, każdy refetch
-      idzie do API. Osobny dłuższy TTL dla zapytań z `start_time` byłby
-      bezpieczny (tamte ID nie znikają).
-- [ ] **DB.path =** `draft_analyzer/drafts.db` (kohorta dzieli plik z
-      draftami). Spójniej byłoby trzymać kohortę w `scouting.db` razem
-      z profilami i cache'em API. Wymaga migracji.
 - [ ] **Lolpros account scraping** — pełne pobranie HTML każdej strony.
       Można dodać `If-Modified-Since` i cache po `Last-Modified` —
       drugi scrape tego samego gracza byłby tańszy.
+- [ ] **`.next/` i `.vscode/` w roocie repo** — wiszą jako nieśledzone.
+      `.next/` to build Next.js (apps/web), powinien iść do `.gitignore`.
+
+## Zrobione (zweryfikowane w kodzie, 2026-06-01)
+
+- [x] **Per-region kohorty** — `region_for_platform` + filter region w
+      „Compare against cohort" (`app/soloq_lookup_page.py`,
+      `src/processing/comparison.py`). KR i EU porównywane osobno.
+- [x] **Champion-specific comparison** — `filter_matches_by_champion`
+      w `src/processing/soloq_aggregates.py` + filtr championa w UI.
+- [x] **Visualization Z-score bar chart** — `z_score_sentiment`
+      (diverging bar chart, zielone w prawo / czerwone w lewo).
+- [x] **Unit testy** dla `comparison.py`, `soloq_aggregates.py`,
+      `cohort_baseline.py` (+ `test_lolpros.py`, `test_match_ids.py`)
+      w `apps/streamlit-dashboard/tests/`.
+- [x] **Match IDs cache TTL** — osobny `_MATCH_IDS_ARCHIVE_TTL` (24h) dla
+      zapytań z `start_time` (lista sezonowa jest stabilna), krótki
+      15-min TTL został dla live lookup (`packages/shared/.../riot_client.py`).
+- [x] **Kohorta w osobnej bazie** — podział baz per domena
+      (profiles/cache/drafts/players/cohort.db); kohorta nie dzieli już
+      pliku z draftami (P3, `src/paths.py`).
+- [x] **Refaktor monorepo (kontekst)** — `apps/` + `packages/shared`,
+      centralizacja ścieżek DB, równoległy fetch meczy + batch upsert (P1–P6).
