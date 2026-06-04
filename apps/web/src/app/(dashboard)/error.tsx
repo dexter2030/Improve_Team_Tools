@@ -7,10 +7,12 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function DashboardError({
   error,
-  reset,
+  unstable_retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  // Next 16.2+: re-fetch + re-render segmentu (w przeciwieństwie do reset(),
+  // który tylko re-renderuje bez ponownego pobrania — błąd danych by wrócił).
+  unstable_retry: () => void;
 }) {
   useEffect(() => {
     // Loguje do konsoli przeglądarki + Vercel runtime logs (jako client-side throw).
@@ -32,7 +34,7 @@ export default function DashboardError({
             </p>
           )}
           <div className="flex gap-2 pt-2">
-            <Button onClick={reset} size="sm">
+            <Button onClick={() => unstable_retry()} size="sm">
               <RefreshCw className="h-3.5 w-3.5 mr-1" />
               Try again
             </Button>

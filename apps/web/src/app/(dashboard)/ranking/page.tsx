@@ -22,14 +22,24 @@ import {
   getStatsSyncStates,
 } from "@/lib/ranking/stats-repository";
 import { RankingSyncButton } from "./sync-button";
+import { RankingSchemaNotice } from "./schema-notice";
+import { isSchemaBehindError } from "@/lib/ranking/schema-error";
 
 export const dynamic = "force-dynamic";
 
 export default async function RankingIndex() {
-  const [counts, sync] = await Promise.all([
-    statsPlayerCounts(),
-    getStatsSyncStates(),
-  ]);
+  let counts: Record<string, number> = {};
+  let sync: Awaited<ReturnType<typeof getStatsSyncStates>> = [];
+  let schemaBehind = false;
+  try {
+    [counts, sync] = await Promise.all([
+      statsPlayerCounts(),
+      getStatsSyncStates(),
+    ]);
+  } catch (e) {
+    if (!isSchemaBehindError(e)) throw e;
+    schemaBehind = true;
+  }
   const syncMap = new Map(sync.map((s) => [s.league, s]));
 
   return (
@@ -43,45 +53,51 @@ export default async function RankingIndex() {
         </p>
       </div>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
-          <div className="flex items-start gap-3">
-            <Flag className="h-5 w-5 mt-0.5 text-primary shrink-0" />
-            <div>
-              <p className="font-medium">Ranking Polaków</p>
-              <p className="text-sm text-muted-foreground">
-                Wszyscy gracze polskiej narodowości ze zsynchronizowanych lig w
-                jednym rankingu — niezależnie od ligi.
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/ranking/nationality/Poland"
-            className={buttonVariants({ variant: "default", size: "sm" })}
-          >
-            Otwórz <ArrowRight className="h-4 w-4 ml-1" />
-          </Link>
-        </CardContent>
-      </Card>
+      {schemaBehind ? (
+        <RankingSchemaNotice />
+      ) : (
+        <>
+          <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+              <div className="flex items-start gap-3">
+                <Flag className="h-5 w-5 mt-0.5 text-primary shrink-0" />
+                <div>
+                  <p className="font-medium">Ranking Polaków</p>
+                  <p className="text-sm text-muted-foreground">
+                    Wszyscy gracze polskiej narodowości ze zsynchronizowanych lig
+                    w jednym rankingu — niezależnie od ligi.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/ranking/nationality/Poland"
+                className={buttonVariants({ variant: "default", size: "sm" })}
+              >
+                Otwórz <ArrowRight className="h-4 w-4 ml-1" />
+              </Link>
+            </CardContent>
+          </Card>
 
-      <Section
-        title="Tier 1"
-        leagues={LEAGUE_GROUPS.tier1}
-        counts={counts}
-        syncMap={syncMap}
-      />
-      <Section
-        title="ERL — D1"
-        leagues={LEAGUE_GROUPS.erlD1}
-        counts={counts}
-        syncMap={syncMap}
-      />
-      <Section
-        title="ERL — D2"
-        leagues={LEAGUE_GROUPS.erlD2}
-        counts={counts}
-        syncMap={syncMap}
-      />
+          <Section
+            title="Tier 1"
+            leagues={LEAGUE_GROUPS.tier1}
+            counts={counts}
+            syncMap={syncMap}
+          />
+          <Section
+            title="ERL — D1"
+            leagues={LEAGUE_GROUPS.erlD1}
+            counts={counts}
+            syncMap={syncMap}
+          />
+          <Section
+            title="ERL — D2"
+            leagues={LEAGUE_GROUPS.erlD2}
+            counts={counts}
+            syncMap={syncMap}
+          />
+        </>
+      )}
     </div>
   );
 }

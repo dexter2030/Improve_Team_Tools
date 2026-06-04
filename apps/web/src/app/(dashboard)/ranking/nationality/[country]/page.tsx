@@ -18,6 +18,8 @@ import { parseYearRange, yearRangeLabel } from "@/lib/ranking/year-range";
 import { RankingSortHeader } from "../../sort-header";
 import { RankingFilters } from "../../ranking-filters";
 import { SplitTrend } from "../../split-trend";
+import { RankingSchemaNotice } from "../../schema-notice";
+import { isSchemaBehindError } from "@/lib/ranking/schema-error";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +48,18 @@ export default async function NationalityRanking({
   const sort = sp.sort || "rating:desc";
   const range = parseYearRange(sp.from, sp.to);
 
-  const [all, years] = await Promise.all([
-    getNationalityRanking(country, range),
-    distinctStatYears(),
-  ]);
+  let all: Awaited<ReturnType<typeof getNationalityRanking>> = [];
+  let years: number[] = [];
+  let schemaBehind = false;
+  try {
+    [all, years] = await Promise.all([
+      getNationalityRanking(country, range),
+      distinctStatYears(),
+    ]);
+  } catch (e) {
+    if (!isSchemaBehindError(e)) throw e;
+    schemaBehind = true;
+  }
   const roles = [
     ...new Set(all.map((p) => p.role).filter(Boolean)),
   ].sort() as string[];
@@ -75,7 +85,9 @@ export default async function NationalityRanking({
         </p>
       </div>
 
-      {years.length === 0 ? (
+      {schemaBehind ? (
+        <RankingSchemaNotice />
+      ) : years.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             Brak zsynchronizowanych statystyk. Wróć do{" "}

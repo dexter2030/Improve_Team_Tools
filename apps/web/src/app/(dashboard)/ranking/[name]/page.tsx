@@ -20,6 +20,8 @@ import { parseYearRange, yearRangeLabel } from "@/lib/ranking/year-range";
 import { RankingSortHeader } from "../sort-header";
 import { RankingFilters } from "../ranking-filters";
 import { SplitTrend } from "../split-trend";
+import { RankingSchemaNotice } from "../schema-notice";
+import { isSchemaBehindError } from "@/lib/ranking/schema-error";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +40,18 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
   const sort = sp.sort || "rating:desc";
   const range = parseYearRange(sp.from, sp.to);
 
-  const [all, years] = await Promise.all([
-    getLeagueRanking(league, range),
-    distinctStatYears(league),
-  ]);
+  let all: Awaited<ReturnType<typeof getLeagueRanking>> = [];
+  let years: number[] = [];
+  let schemaBehind = false;
+  try {
+    [all, years] = await Promise.all([
+      getLeagueRanking(league, range),
+      distinctStatYears(league),
+    ]);
+  } catch (e) {
+    if (!isSchemaBehindError(e)) throw e;
+    schemaBehind = true;
+  }
   const roles = [...new Set(all.map((p) => p.role).filter(Boolean))].sort() as string[];
   const filtered = roleFilter ? all.filter((p) => p.role === roleFilter) : all;
   const rows = sortRankedPlayers(filtered, sort);
@@ -65,7 +75,9 @@ export default async function LeagueRanking({ params, searchParams }: Props) {
         </p>
       </div>
 
-      {years.length === 0 ? (
+      {schemaBehind ? (
+        <RankingSchemaNotice />
+      ) : years.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             Brak danych dla tej ligi. Wróć do{" "}
